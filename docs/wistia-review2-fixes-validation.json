@@ -74,12 +74,207 @@
         "happy_dom_20_14_5": 243979
       },
       "limits": "Single run before native/integration jobs began. Query microbenchmark only; not an end-to-end suite speed claim."
+    },
+    "style_read_repeated_comparison": {
+      "runs": [
+        {
+          "round": 1,
+          "condition": "before",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.221401999999998,
+            "property": 26.481851999999975
+          }
+        },
+        {
+          "round": 1,
+          "condition": "after",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.2427959999999985,
+            "property": 27.16984199999999
+          }
+        },
+        {
+          "round": 2,
+          "condition": "after",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.267990999999995,
+            "property": 28.062246000000016
+          }
+        },
+        {
+          "round": 2,
+          "condition": "before",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.241070999999991,
+            "property": 26.668158000000005
+          }
+        },
+        {
+          "round": 3,
+          "condition": "before",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.331392000000008,
+            "property": 27.904102999999992
+          }
+        },
+        {
+          "round": 3,
+          "condition": "after",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.246890000000008,
+            "property": 28.182064999999994
+          }
+        },
+        {
+          "round": 4,
+          "condition": "after",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.260465999999994,
+            "property": 27.223829999999992
+          }
+        },
+        {
+          "round": 4,
+          "condition": "before",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.267303999999996,
+            "property": 27.065339000000023
+          }
+        },
+        {
+          "round": 5,
+          "condition": "before",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.271217000000007,
+            "property": 27.670068999999984
+          }
+        },
+        {
+          "round": 5,
+          "condition": "after",
+          "iterations": 100000,
+          "samples": 5,
+          "median_ms": {
+            "cssText": 4.255579999999995,
+            "property": 27.969876
+          }
+        }
+      ],
+      "median_across_process_medians_ms": {
+        "before": {
+          "cssText": 4.267303999999996,
+          "property": 27.065339000000023
+        },
+        "after": {
+          "cssText": 4.255579999999995,
+          "property": 27.969876
+        }
+      },
+      "protocol": "Five independent processes per condition, alternating before/after order each round, after all native and Wistia checks finished. Each process runs bench/style-read.mjs unchanged (five samples,100000 reads/sample).",
+      "before_commit": "daa389c",
+      "after_commit": "3749ec6",
+      "interpretation": "Initial cssText slowdown was not reproduced. Property-read process medians were approximately3.3% slower; these observations do not establish end-to-end suite impact.",
+      "limits": "Single machine, no statistical confidence interval; machine and JIT variability remain possible."
     }
   },
-  "wistia_integration": "Root agent is running the unchanged 63-file compatibility selection; results will be appended after completion.",
+  "wistia_integration": {
+    "files": 63,
+    "passed_files": 63,
+    "failed_files": 0,
+    "passed_tests": 519,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "workers": 3,
+    "scope": "Unchanged original56-file selection plus7 follow-up regression files. This does not rerun the complete257-file audit or full Wistia suite.",
+    "reproduction": "ASDF_NODEJS_VERSION=24.19.0 node bench/wistia-compatibility.mjs --wistia PATH --files docs/wistia-review2-fixes-validation.json --output OUTPUT --workers 3 --only fork"
+  },
   "limits": [
     "This remains a partial DOM implementation and does not expand custom-element lifecycle support.",
     "CSS comment handling fixes declaration tokenization; it is not a complete CSS grammar validator.",
     "Existing custom-property whitespace behavior is preserved rather than broadened to full browser CSSOM conformance."
+  ],
+  "tested_fork_commit": "3749ec61eec197b2727f09e400fc60ab7b20a95a",
+  "files": [
+    "frontend/components/2025redesign/screenLayouts/GlobalActions/SideNav/SideNavButton.vitest.tsx",
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/components/Waveform/WaveformCanvas.vitest.tsx",
+    "frontend/components/chooser-v2/components/__tests__/ChooserChrome.vitest.tsx",
+    "frontend/jquery/jquery-legacy-compat.vitest.js",
+    "frontend/jquery/jquery-ready-timing.vitest.js",
+    "frontend/pricing/components/MapConnectionBanner/MapConnectionBannerView.vitest.tsx",
+    "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveAndRestore/RestoreMediaButton.vitest.jsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/colorOptionUtils.vitest.ts",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/CancelScreen/CancelPage.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/MotionKitSettings/motionKitListCache.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/TrimHandle.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/channelCreationNavState.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+    "frontend/singlePageApp/screens/CreateSocialClips/services/useGetFoldersService/useGetFoldersService.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/application/useSelectionAttributes.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/domain/lanes/track.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Registration/hooks/selectors.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/JoinYourOrgScreen/JoinYourOrgScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/common/WtwSurface.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/components/dataTable/cells/EmbedLocationCell.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts",
+    "frontend/vitest/noNetwork.vitest.mts",
+    "frontend/wistia-remotion/useTypedInputPropsForRoot.vitest.tsx",
+    "frontend/mcpAppSandbox/sandboxProxy.vitest.ts",
+    "frontend/components/BackgroundColorPicker/BackgroundColorPicker.vitest.tsx",
+    "frontend/components/ColorPicker/ColorPicker.vitest.tsx",
+    "frontend/singlePageApp/hooks/useMotionKitCompletionNotifications.vitest.ts",
+    "frontend/onboarding/components/FancyTooltip/FancyTooltip.vitest.tsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/DropdownColorPicker.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx"
   ]
 }

@@ -236,9 +236,9 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
 - `getByLabelText` was O(n²) (element.labels → getElementsByTagName('label') per element);
   the caches took it 1342→~270µs.
 Numbers in README.md — refresh both (bench against jsdom AND happy-dom) if you touch hot paths.
-The Wistia fork's Linux ARM64 query smoke snapshot is 837,401 iters/sec versus jsdom
-29.1.1 at 1,222 and happy-dom 20.14.5 at 247,665 (Node 24.19.0, single run).
-See `docs/wistia-review-fixes-validation.json` for current observations and scope.
+The Wistia fork's Linux ARM64 query smoke snapshot is 760,626 iters/sec versus jsdom
+29.1.1 at 1,054 and happy-dom 20.14.5 at 243,979 (Node 24.19.0, single run).
+See `docs/wistia-review2-fixes-validation.json` for current observations and scope.
 - **Parse memoization (index.mjs `parseBufferCached`).** The SoA buffer is READ-ONLY — every
   mutation goes to a Document's own `__kids`/`__attrs`/`__cache` overlay, never the buffer — so
   the same buffer backs many Documents. Suites call setup with the same shell HTML per file →

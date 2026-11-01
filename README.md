@@ -201,13 +201,15 @@ Wistia fork query smoke check on Linux ARM64, Node 24.19.0 (`npm run bench:query
 | turbo-dom, after first compatibility fixes | 800,731 |
 | turbo-dom, after second compatibility fixes | 791,718 |
 | turbo-dom, after review fixes | 837,401 |
-| jsdom 29.1.1, latest run | 1,222 |
-| happy-dom 20.14.5, latest run | 247,665 |
+| turbo-dom, after second review fixes | 760,626 |
+| jsdom 29.1.1, latest run | 1,054 |
+| happy-dom 20.14.5, latest run | 243,979 |
 
 These are single-run microbenchmark observations, not end-to-end suite timings.
 The [validation record](docs/wistia-six-file-validation.json) includes the initial runs; the [follow-up record](docs/wistia-wave2-fixes-validation.json)
 includes the second compatibility smoke check; the
-[review-fix record](docs/wistia-review-fixes-validation.json) includes the latest run.
+[review-fix record](docs/wistia-review-fixes-validation.json) includes the first review run.
+The [second review-fix record](docs/wistia-review2-fixes-validation.json) includes the latest run.
 
 ## How it works
 
