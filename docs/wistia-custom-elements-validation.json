@@ -1,0 +1,169 @@
+{
+  "date": "2026-11-01",
+  "tested_fork_commit": "384e12f623621598af32b8441e81597ec9de8a04",
+  "base_commit": "c6d325a",
+  "wistia_commit": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+  "scope": "Autonomous custom elements in the JS test runtime. Wistia validation was restricted to the six custom-element-related files requested by the user. No457-file or200-file sample and no performance comparison were run.",
+  "implemented": [
+    "Document-bound lazy CustomElementRegistry and HTMLElement construction bridge; direct new and identity-preserving late upgrades with private fields.",
+    "define/get/getName/whenDefined/upgrade, constructor/name/duplicate validation and explicit rejection of unsupported definition types.",
+    "Synchronous programmatic creation, lazy parsed-tree and fragment upgrades, and HTML-namespace-only construction.",
+    "Observed attribute snapshots and connected/disconnected/adopted reactions with operation-boundary batching, nested reactions and backup microtasks.",
+    "Clone/import construction in parent-before-child order; target-registry import and original-definition adoption including closed shadow trees.",
+    "Registry/constructor isolation across windows, context disposal on reset/teardown and invalidation of discarded frame reactions.",
+    "Failed construction reports errors and cannot be retried; engine invariants use captured DOM methods rather than author overrides.",
+    "Allocation-free :defined matching; reaction queues allocate lazily only when a reaction exists."
+  ],
+  "focused_validation": {
+    "command": "ASDF_NODEJS_VERSION=24.19.0 node --test --experimental-test-coverage --test-coverage-include='src/runtime/custom-elements.mjs' test/custom-element-*.test.mjs",
+    "passed": 32,
+    "failed": 0,
+    "module_coverage_percent": {
+      "lines": 100,
+      "functions": 100,
+      "branches": 97.18
+    },
+    "includes": "A custom element mounting a lazy React root, waiting for module readiness, signaling its effect, and unmounting on disconnection."
+  },
+  "wistia_validation": {
+    "selection": "wistia-custom-elements-selection.json",
+    "workers_per_condition": 2,
+    "results": {
+      "jsdom": {
+        "files": 6,
+        "file_states": {
+          "passed": 5,
+          "failed": 1
+        },
+        "passed_tests": 81,
+        "failed_tests": 1,
+        "skipped_tests": 0,
+        "todo_tests": 7,
+        "total_cases": 89
+      },
+      "fork_before": {
+        "files": 6,
+        "file_states": {
+          "failed": 2,
+          "passed": 4
+        },
+        "passed_tests": 79,
+        "failed_tests": 3,
+        "skipped_tests": 0,
+        "todo_tests": 7,
+        "total_cases": 89
+      },
+      "fork_after": {
+        "files": 6,
+        "file_states": {
+          "failed": 2,
+          "passed": 4
+        },
+        "passed_tests": 79,
+        "failed_tests": 3,
+        "skipped_tests": 0,
+        "todo_tests": 7,
+        "total_cases": 89
+      }
+    },
+    "per_file": [
+      {
+        "file": "frontend/webComponents/react-component.vitest.jsx",
+        "jsdom": "failed",
+        "fork_before": "failed",
+        "fork_after": "failed",
+        "case_count": 1
+      },
+      {
+        "file": "frontend/singlePageApp/screens/PlaylistCustomizeRedesign/components/PlaylistEmbed.vitest.tsx",
+        "jsdom": "passed",
+        "fork_before": "passed",
+        "fork_after": "passed",
+        "case_count": 14
+      },
+      {
+        "file": "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useOverlayWistiaPlayer.vitest.ts",
+        "jsdom": "passed",
+        "fork_before": "passed",
+        "fork_after": "passed",
+        "case_count": 6
+      },
+      {
+        "file": "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Video/SharedMediaAuroraEmbed.vitest.tsx",
+        "jsdom": "passed",
+        "fork_before": "passed",
+        "fork_after": "passed",
+        "case_count": 3
+      },
+      {
+        "file": "frontend/singlePageApp/components/TagManager/mountTagManager.vitest.ts",
+        "jsdom": "passed",
+        "fork_before": "passed",
+        "fork_after": "passed",
+        "case_count": 23
+      },
+      {
+        "file": "frontend/singlePageApp/screens/AnonymousMedia/layouts/BaseLayout.vitest.tsx",
+        "jsdom": "passed",
+        "fork_before": "failed",
+        "fork_after": "failed",
+        "case_count": 42
+      }
+    ],
+    "remaining_failures": [
+      {
+        "file": "frontend/webComponents/react-component.vitest.jsx",
+        "test": "react-component > marks the element as mounted once the lazy component has rendered",
+        "jsdom": "failed",
+        "before": "failed",
+        "after": "failed",
+        "classification": "Shared app React mount-marker failure; fork now executes connectedCallback and reaches the same assertion as jsdom.",
+        "message": "expect(element).toHaveAttribute(\"data-react-mounted\") // element.hasAttribute(\"data-react-mounted\")\n\nExpected the element to have attribute:\n  data-react-mounted\nReceived:\n  null\n\nIgnored nodes: comments, script, style\n<html>\n  <head />\n  <body>\n    <react-component\n      importpath=\"components/Auth/InputPassword/railsEntryPoint\"\n      props=\"{\\\"name\\\":\\\"password\\\",\\\"id\\\":\\\"pas"
+      },
+      {
+        "file": "frontend/singlePageApp/screens/AnonymousMedia/layouts/BaseLayout.vitest.tsx",
+        "test": "BaseLayout (AnonymousMedia) > letterbox > visibility > extends beyond the player in the theatre layout so a 16:9 video still shows the surround",
+        "jsdom": "passed",
+        "before": "failed",
+        "after": "failed",
+        "classification": "Pre-existing CSS compatibility issue, unrelated to custom-element construction/lifecycle.",
+        "message": "expected '100vw' to be '1024px' // Object.is equality"
+      },
+      {
+        "file": "frontend/singlePageApp/screens/AnonymousMedia/layouts/BaseLayout.vitest.tsx",
+        "test": "BaseLayout (AnonymousMedia) > mobile drawer > open / close interactions > locks body scroll while the drawer is open and restores it on close",
+        "jsdom": "passed",
+        "before": "failed",
+        "after": "failed",
+        "classification": "Pre-existing CSS compatibility issue, unrelated to custom-element construction/lifecycle.",
+        "message": "expect(element).toHaveStyle()\n\n- Expected\n\n- overflow: visible;\n+ overflow: ;"
+      }
+    ],
+    "interpretation": "No new failing tests relative to the pre-change fork. The previously missing connectedCallback/import step now succeeds; the remaining React mount-marker failure matches jsdom. Two BaseLayout CSS failures also reproduce on the old fork."
+  },
+  "mandatory_commit_hook": {
+    "automatic_repository_gate": true,
+    "passed_tests": 723,
+    "skipped_tests": 4,
+    "failed_tests": 0,
+    "coverage_percent": {
+      "lines": 99.33,
+      "branches": 95.92,
+      "functions": 98.33
+    },
+    "note": "The existing mandatory native coverage/conformance hook runs automatically on source commits. The implementation validation selection remained custom-element tests only. An obsolete custom-element stub assertion upgrade() without a Node was strengthened to expect TypeError."
+  },
+  "remaining_limits": [
+    "Customized built-ins (is=/extends), form-associated custom elements/ElementInternals, scoped registries/initialize and moveBefore/connectedMoveCallback are not implemented. Unsupported definitions fail explicitly.",
+    "This runtime still shares DOM base prototypes and does not provide complete isolated JavaScript realms or browser navigation/script execution.",
+    "Namespaced attribute operations retain the existing DOM namespace API limitations; ordinary HTML observed-attribute callbacks are covered.",
+    "General DOM APIs and full web-platform custom-element conformance are not claimed; only the described autonomous subset and tests were validated.",
+    "The existing shared React application fixture failure and pre-existing CSS assertions remain open.",
+    "No new performance numbers are claimed. Ordinary query/selector paths acquire no custom-element per-node allocation; full performance comparison remains stopped."
+  ],
+  "references": [
+    "https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-reactions",
+    "https://html.spec.whatwg.org/multipage/custom-elements.html#upgrades"
+  ],
+  "reproduction": "ASDF_NODEJS_VERSION=24.19.0 node bench/wistia-compatibility.mjs --wistia PATH --files docs/wistia-custom-elements-selection.json --output OUTPUT --workers 2 --only fork"
+}

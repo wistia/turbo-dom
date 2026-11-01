@@ -124,6 +124,15 @@ to set up `document`/`window` on any global object.
 
 ## Compatibility
 
+The JS runtime supports autonomous custom elements: document-bound registries,
+constructors and late upgrades, observed attributes, connection/adoption callbacks,
+and clone/import/reset isolation. The [custom-element validation](docs/wistia-custom-elements-validation.json)
+records 32 passing focused tests and the six-file Wistia selection. That selection
+still has three pre-existing failures: one React mount-marker failure shared with
+jsdom and two CSS assertions. Customized built-ins, ElementInternals and scoped
+registries remain unsupported. No broad Wistia sample or runtime comparison was
+rerun for this change.
+
 The Wistia fork's original 56-file compatibility sample passes **431/431 tests**
 after the browser API fixes, including all six previously failing files. This
 does not cover the complete Wistia suite. See the [validation results](docs/wistia-six-file-validation.json)
