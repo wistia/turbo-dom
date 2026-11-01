@@ -349,7 +349,7 @@ const ON_EVENTS = [
   'pointerenter', 'pointerleave', 'pointercancel', 'touchstart', 'touchend',
   'touchmove', 'animationstart', 'animationend', 'transitionend', 'paste', 'copy',
   'cut', 'drop', 'dragstart', 'dragover', 'dragend', 'select', 'invalid', 'beforeinput',
-  'play', 'pause', 'emptied', 'volumechange',
+  'play', 'pause', 'emptied', 'volumechange', 'formdata',
 ];
 for (const type of ON_EVENTS) {
   const slot = '__on_' + type;

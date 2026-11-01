@@ -13,6 +13,7 @@ import {
 import { makeGetComputedStyle } from './cascade.mjs';
 import { CSSStyleSheet } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
+import { MessageChannel, MessagePort, cloneMessage } from './messaging.mjs';
 import {
   Node, Element, CanvasElement, MediaElement, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
   MutationObserver, DOMParser, XMLSerializer, ShadowRoot,
@@ -37,6 +38,7 @@ class ClipboardEvent extends Event {
 // FormData that preserves File/Blob identity. Node's global FormData clones
 // entries into anonymous Blobs (losing the File reference + filename); tests that
 // assert `fd.get('file') === file` need the original kept.
+let constructingForms;
 class TurboFormData {
   constructor(form, submitter = null) {
     this.__entries = [];
@@ -54,50 +56,73 @@ class TurboFormData {
           : Object.assign(new Error(message), { name: 'NotFoundError' });
       }
     }
-    const root = form.getRootNode();
-    for (const control of root.querySelectorAll('input,select,textarea,button')) {
-      if (control.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue;
-      if (this.__formOwner(control) !== form || this.__excluded(control)) continue;
-      const tag = control.localName;
-      const type = String(control.type || '').toLowerCase();
-      const name = control.getAttribute('name') || '';
-      if (tag === 'input' && type === 'image') {
-        if (control === submitter) {
-          this.append(name ? name + '.x' : 'x', '0');
-          this.append(name ? name + '.y' : 'y', '0');
+    if (!constructingForms) constructingForms = new WeakSet();
+    if (constructingForms.has(form)) {
+      const message = 'FormData construction is already in progress for this form';
+      throw globalThis.DOMException ? new globalThis.DOMException(message, 'InvalidStateError')
+        : Object.assign(new Error(message), { name: 'InvalidStateError' });
+    }
+    constructingForms.add(form);
+    try {
+      const root = form.getRootNode();
+      for (const control of root.querySelectorAll('input,select,textarea,button')) {
+        if (control.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue;
+        if (this.__formOwner(control) !== form || this.__excluded(control)) continue;
+        const tag = control.localName;
+        const type = String(control.type || '').toLowerCase();
+        const name = control.getAttribute('name') || '';
+        if (tag === 'input' && type === 'image') {
+          if (control === submitter) {
+            this.append(name ? name + '.x' : 'x', '0');
+            this.append(name ? name + '.y' : 'y', '0');
+          }
+          continue;
         }
-        continue;
-      }
-      if (!name) continue;
-      if (tag === 'button' || (tag === 'input' && (type === 'submit' || type === 'button' || type === 'reset'))) {
-        if (control === submitter) this.append(name, control.value ?? control.__value ?? control.getAttribute('value') ?? '');
-        continue;
-      }
-      if (tag === 'input' && (type === 'checkbox' || type === 'radio')) {
-        if (control.checked) this.append(name, !control.hasAttribute('value') && control.__value === undefined ? 'on' : control.value);
-      } else if (tag === 'input' && type === 'file') {
-        const files = control.files;
-        if (files && files.length) {
-          for (let i = 0; i < files.length; i++) this.append(name, files[i]);
+        if (!name) continue;
+        if (tag === 'button' || (tag === 'input' && (type === 'submit' || type === 'button' || type === 'reset'))) {
+          if (control === submitter) this.append(name, control.value ?? control.__value ?? control.getAttribute('value') ?? '');
+          continue;
+        }
+        if (tag === 'input' && (type === 'checkbox' || type === 'radio')) {
+          if (control.checked) this.append(name, !control.hasAttribute('value') && control.__value === undefined ? 'on' : control.value);
+        } else if (tag === 'input' && type === 'file') {
+          const files = control.files;
+          if (files && files.length) {
+            for (let i = 0; i < files.length; i++) this.append(name, files[i]);
+          } else {
+            this.append(name, new TURBO_FILE([], '', { type: 'application/octet-stream' }));
+          }
+        } else if (tag === 'select') {
+          for (const option of control.options) if (option.selected && !this.__optionDisabled(option)) this.append(name, option.value);
         } else {
-          this.append(name, new TURBO_FILE([], '', { type: 'application/octet-stream' }));
-        }
-      } else if (tag === 'select') {
-        const options = Array.from(control.options);
-        let selected = options.filter(option => option.selected);
-        if (!control.multiple) {
-          if (selected.length) selected = selected.slice(-1);
-          else if (!(Number(control.getAttribute('size')) > 1) && !options.some(option => option.__selected !== undefined)) {
-            const first = options.find(option => !this.__optionDisabled(option));
-            if (first) selected = [first];
+          this.append(name, control.value ?? '');
+          const dirname = control.getAttribute('dirname');
+          if (dirname && (tag === 'textarea' || ['hidden', 'text', 'search', 'tel', 'url', 'email'].includes(type))) {
+            this.append(dirname, this.__direction(control));
           }
         }
-        for (const option of selected) if (!this.__optionDisabled(option)) this.append(name, option.value);
-      } else {
-        this.append(name, control.value ?? '');
       }
+      form.dispatchEvent(new FormDataEvent('formdata', { formData: this, bubbles: true }));
+    } finally {
+      constructingForms.delete(form);
     }
   }
+  __direction(control) {
+    for (let element = control; element; element = element.parentElement) {
+      const direction = (element.getAttribute('dir') || '').toLowerCase();
+      if (direction === 'ltr' || direction === 'rtl') return direction;
+      if (direction === 'auto') {
+        const text = element === control ? control.value : element.textContent;
+        for (const character of text || '') {
+          if (/\p{Letter}/u.test(character)) {
+            return /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u.test(character) ? 'rtl' : 'ltr';
+          }
+        }
+      }
+    }
+    return 'ltr';
+  }
+
   __isSubmitButton(control) {
     const type = String(control.type || '').toLowerCase();
     return control.localName === 'input' ? type === 'submit' || type === 'image'
@@ -154,6 +179,14 @@ class TurboFormData {
   [Symbol.iterator]() { return this.entries(); }
 }
 
+class FormDataEvent extends Event {
+  constructor(type, init = {}) {
+    if (!(init.formData instanceof TurboFormData)) throw new TypeError('FormDataEvent requires formData');
+    super(type, init);
+    this.formData = init.formData;
+  }
+}
+
 // A tag-specific HTML*Element interface. Not constructible — exists so
 // `el instanceof HTMLXElement` is true only for elements with the matching
 // localName (matcher = string or RegExp). Avoids aliasing every interface to
@@ -175,38 +208,6 @@ function tagClass(matcher, prototype = Element.prototype) {
 // the bare names on globalThis (which would make these delegates call themselves).
 const hostSetTimeout = globalThis.setTimeout;
 const hostClearTimeout = globalThis.clearTimeout;
-
-// MessageChannel/MessagePort — React 19's scheduler posts its work loop through a
-// MessagePort hop (falling back to setTimeout only if absent). We ship a real,
-// self-contained polyfill whose delivery is scheduled via the LIVE globalThis.
-// setTimeout (read at call time, like rAF), so a render tier that owns setTimeout
-// (a virtual-clock pump) catches every scheduler hop → React runs in virtual time,
-// bounded by the drain/deadline — and it exists in the bare V8 isolate, which has
-// no host MessageChannel. See MESSAGECHANNEL-VIRTUALIZE.md + the clock note in
-// CLAUDE.md. Delivery uses delay 0 (a yield, not elapsed time — animations get
-// their time from rAF's 16ms frame).
-class MessagePort extends EventTarget {
-  constructor() { super(); this.onmessage = null; this.onmessageerror = null; this.__other = null; }
-  start() {}
-  close() { this.__other = null; }
-  postMessage(data) {
-    const target = this.__other;
-    if (!target) return;
-    (globalThis.setTimeout || hostSetTimeout)(() => {
-      const ev = new Event('message'); ev.data = data;
-      if (typeof target.onmessage === 'function') target.onmessage(ev);
-      target.dispatchEvent(ev);
-    }, 0);
-  }
-}
-class MessageChannel {
-  constructor() {
-    this.port1 = new MessagePort();
-    this.port2 = new MessagePort();
-    this.port1.__other = this.port2;
-    this.port2.__other = this.port1;
-  }
-}
 
 // Env-independent lazy global factories — built ONCE at module load, shared by
 // every window (none capture document/url/windowProxy). Materialization still
@@ -251,6 +252,7 @@ const hostSetInterval = globalThis.setInterval;
 const hostClearInterval = globalThis.clearInterval;
 const hostQueueMicrotask = globalThis.queueMicrotask;
 const hostStructuredClone = globalThis.structuredClone;
+let activeMessageWindow = null;
 
 export function createWindow(document, { url = 'http://localhost/', parentWindow = null, topWindow = null, frameElement = null, inheritedOrigin, isAncestorActive = null } = {}) {
   const touched = new Set();
@@ -287,7 +289,12 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     // its two Maps eagerly per createWindow was wasted for the typical test.
     Image: function Image(w, h) { const img = document.createElement('img'); if (w != null) img.setAttribute('width', w); if (h != null) img.setAttribute('height', h); return img; },
     getSelection: () => document.getSelection(),
-    dispatchEvent: (e) => EventTarget.prototype.dispatchEvent.call(receiver(), e),
+    dispatchEvent: (e) => {
+      const previous = activeMessageWindow;
+      activeMessageWindow = receiver();
+      try { return EventTarget.prototype.dispatchEvent.call(receiver(), e); }
+      finally { activeMessageWindow = previous; }
+    },
     addEventListener: (...a) => EventTarget.prototype.addEventListener.call(receiver(), ...a),
     removeEventListener: (...a) => EventTarget.prototype.removeEventListener.call(receiver(), ...a),
     get onmessage() { return messageHandler; },
@@ -306,7 +313,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
         targetOrigin = targetOrigin.targetOrigin ?? '/';
       }
       const target = receiver();
-      const source = globalThis.window || target;
+      const source = activeMessageWindow || globalThis.window || topWindow || parentWindow || target;
       const origin = source.origin || source.location?.origin || 'null';
       let allowedOrigin = String(targetOrigin);
       if (allowedOrigin === '/') allowedOrigin = origin;
@@ -314,13 +321,12 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
         try { allowedOrigin = new URL(allowedOrigin).origin; }
         catch { throw new SyntaxError('Invalid target origin'); }
       }
-      if (typeof hostStructuredClone !== 'function') throw new Error('postMessage requires host structuredClone');
-      const data = hostStructuredClone(message, { transfer });
+      const { data, ports } = cloneMessage(message, transfer);
       const sentGeneration = generation;
       (globalThis.setTimeout || hostSetTimeout)(() => {
         if (sentGeneration !== generation || target.document !== document || (isAncestorActive && !isAncestorActive())
           || (allowedOrigin !== '*' && allowedOrigin !== windowProxy.origin)) return;
-        const event = new MessageEvent('message', { data, origin, source });
+        const event = new MessageEvent('message', { data, origin, source, ports });
         event.data = data;
         base.dispatchEvent(event);
       }, 0);
@@ -399,25 +405,32 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   });
 
   document.defaultView = windowProxy;
+  function discardFrames(node) {
+    frames?.delete(node);
+    if (node.__kids) for (const child of node.__kids) discardFrames(child);
+  }
   document.__frameWindowFor = (frame) => {
     const html = frame.srcdoc;
+    const hasSrcdoc = frame.hasAttribute('srcdoc');
     if (!frames) frames = new WeakMap();
     let child = frames.get(frame);
-    if (!child || child.html !== html) {
+    if (!child || child.html !== html || child.hasSrcdoc !== hasSrcdoc) {
       const parentGeneration = generation;
       const childDocument = new DOMParser().parseFromString(html, 'text/html');
-      const entry = { html, window: null };
+      const entry = { html, hasSrcdoc, window: null };
       const win = createWindow(childDocument, {
-        url: frame.hasAttribute('srcdoc') ? 'about:srcdoc' : 'about:blank',
+        url: hasSrcdoc ? 'about:srcdoc' : 'about:blank',
         parentWindow: receiver(), topWindow: receiver().top, frameElement: frame,
         inheritedOrigin: windowProxy.origin,
         isAncestorActive: () => parentGeneration === generation && receiver().document === document
-          && frame.isConnected && frames.get(frame) === entry && frame.srcdoc === html
+          && frame.isConnected && frame.ownerDocument === document && frames.get(frame) === entry
+          && frame.srcdoc === html && frame.hasAttribute('srcdoc') === hasSrcdoc
           && (!isAncestorActive || isAncestorActive()),
       });
       entry.window = win.window;
       child = entry;
       frames.set(frame, child);
+      document.__discardFrames ||= discardFrames;
     }
     return child.window;
   };
@@ -431,6 +444,8 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     // Layer 5: drop materialized global slots, keep the class machinery warm.
     resetGlobals() {
       generation++;
+      frames = undefined;
+      document.__discardFrames = null;
       base.__listeners = null;
       messageHandler = null;
       messageErrorHandler = null;
@@ -630,7 +645,7 @@ const STATIC_BASE = {
   AbortController: globalThis.AbortController, AbortSignal: globalThis.AbortSignal,
   TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder,
   Headers: globalThis.Headers, Request: globalThis.Request, Response: globalThis.Response,
-  FormData: TurboFormData, ReadableStream: globalThis.ReadableStream,
+  FormData: TurboFormData, FormDataEvent, ReadableStream: globalThis.ReadableStream,
   crypto: globalThis.crypto, Crypto: globalThis.Crypto, SubtleCrypto: globalThis.SubtleCrypto,
   btoa: (s) => turboBtoa(String(s)),
   atob: (s) => turboAtob(String(s)),

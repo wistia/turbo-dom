@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-01",
+  "base_fork_commit": "ef33b48",
+  "scope": "Improve concrete CSS cascade fidelity without introducing rendering, decoding or full CSS evaluation.",
+  "implemented": [
+    "Author important declarations survive later normal declarations and stylesheet important overrides inline normal; important declarations retain specificity/source-order precedence.",
+    "Important flags propagate to the already-supported margin/padding/border/background shorthand expansions.",
+    "Custom-property names remain case-sensitive in inline CSSOM, stylesheet declaration parsing and computed-style lookup.",
+    "Custom properties inherit across ordinary parents and shadow-host boundaries; document-version caching invalidates on mutation.",
+    "CSSOM custom-property writes trim outer whitespace consistently with reparsed attributes and the installed jsdom oracle.",
+    "Explicit inherit and inherited unset resolve from real parent declarations. Initial or noninherited unset values remain absent rather than inventing a catalog of browser defaults."
+  ],
+  "tests": {
+    "new_regression_file": "test/css-cascade-fidelity.test.mjs",
+    "new_test_cases": 12,
+    "focused_command": "ASDF_NODEJS_VERSION=24.19.0 node --test test/css-cascade-fidelity.test.mjs test/inline-zero-length.test.mjs test/shadow.test.mjs test/shadow-features.test.mjs",
+    "focused_passed": 72,
+    "focused_failed": 0,
+    "oracle_notes": "Installed jsdom29.1.1 supports the ordinary important/inline and whitespace cases, but itself fails important-specificity and same-rule duplicate-important precedence. Those tests assert the CSS author-cascade ordering directly rather than using the oracle result."
+  },
+  "performance": {
+    "hot_selector_paths_changed": false,
+    "allocation_scope": "Priority metadata is a lazily allocated Set only for declaration maps containing important values. Custom inheritance and keyword resolution execute only during getComputedStyle and remain memoized by document version.",
+    "claim": "No isolated throughput improvement or end-to-end suite speed claim; root performs integrated performance smoke."
+  },
+  "remaining_limits": [
+    "Real layout, raster rendering, media decoding/network loading/playback clocks remain outside a DOM test runtime. Existing synthetic geometry, virtual media APIs and canvas test backend are unchanged.",
+    "No var() substitution, fallback/cycle evaluation or registered custom-property semantics are added.",
+    "No complete initial-value catalog, CSS layers/revert, at-rule evaluation, pseudo-element style or state-dependent cascade is added.",
+    "Selector grammar and shorthand support remain partial; no selector parser/hot-path changes are made.",
+    "Shadow cascade retains its existing simplified specificity model; this change does not implement full encapsulation-context priority ordering."
+  ],
+  "integrated_validation": "wistia-remaining-gaps-validation.json"
+}

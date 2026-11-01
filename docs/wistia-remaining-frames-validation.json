@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-01",
+  "scope": "Blank/srcdoc iframe lifecycle and runtime MessagePort clone/transfer compatibility; no JavaScript realm engine or network navigation is added.",
+  "implemented": [
+    "Attribute-presence-aware blank versus srcdoc documents, including empty srcdoc and removal",
+    "Same-value srcdoc assignment replaces the materialized child",
+    "Removed or adopted iframe subtrees discard old windows and cancel queued child/descendant messages, including immediate reinsertion",
+    "Reset clears iframe cache and removal hooks until frames are used again",
+    "Standalone top-level to child messages identify the parent sender; synchronous message-handler replies identify the child sender with inherited origin",
+    "Runtime MessagePort postMessage clones data synchronously, preserves cycles/repeated references/maps/sets, and supports ArrayBuffer transfers",
+    "Runtime MessagePort transfers via window.postMessage or another port create a new receiver wrapper, detach the old wrapper, preserve queued data, and expose received ports through MessageEvent.ports",
+    "MessagePort start/onmessage queue activation, stable handler replacement, close cancellation, and live timer routing for React virtual schedulers",
+    "Primitive messages without transfers avoid clone traversal/maps/sets and remain usable without host structuredClone"
+  ],
+  "validation": {
+    "new_tests": 14,
+    "focused_command": "ASDF_NODEJS_VERSION=24.19.0 node --test test/iframe-port-compatibility.test.mjs test/window-messaging.test.mjs test/coverage-fill.test.mjs",
+    "messaging_module_coverage_percent": {
+      "lines": 100,
+      "branches": 99.04,
+      "functions": 100
+    }
+  },
+  "remaining_limits": [
+    "Iframe script execution, external/data URL navigation, sandbox security/origin isolation, resource loading and browser WindowProxy navigation identity are not implemented.",
+    "Without separate JavaScript realms, sender inference supports installed top-level calls and synchronous message-event replies; arbitrary unbound cross-window calls or later asynchronous callbacks do not provide a true browser incumbent realm.",
+    "Runtime MessagePorts are supported by window/port postMessage transfer lists; native host structuredClone does not directly recognize these custom ports.",
+    "Complex nonprimitive messages require host structuredClone; the bare-isolate fallback supports primitives only.",
+    "MessagePort error-event delivery and host worker/Node MessagePort interoperation are not implemented."
+  ],
+  "integrated_validation": "wistia-remaining-gaps-validation.json"
+}

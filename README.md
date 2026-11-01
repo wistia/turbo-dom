@@ -141,6 +141,11 @@ CSS/event/iframe edge-case fixes and a repeated-style-read microbenchmark.
 The [second review-fix record](docs/wistia-review2-fixes-validation.json) covers CSS
 comments, CSSOM cache normalization, and retained input/pointer event fields.
 
+Subsequent work improves form/template ownership and events, runtime MessagePort
+transfers and iframe lifetimes, and CSS priority/custom-property inheritance. The
+[remaining-gaps validation](docs/wistia-remaining-gaps-validation.json) records
+38 new regression tests, the repeated 257-file check, and the browser features still unsupported.
+
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
 | html5lib-tests conformance | **99.72%** | 37.35% | 97.03% |
@@ -202,14 +207,16 @@ Wistia fork query smoke check on Linux ARM64, Node 24.19.0 (`npm run bench:query
 | turbo-dom, after second compatibility fixes | 791,718 |
 | turbo-dom, after review fixes | 837,401 |
 | turbo-dom, after second review fixes | 760,626 |
-| jsdom 29.1.1, latest run | 1,054 |
-| happy-dom 20.14.5, latest run | 243,979 |
+| turbo-dom, remaining-gap improvements | 808,784 |
+| jsdom 29.1.1, latest run | 1,228 |
+| happy-dom 20.14.5, latest run | 255,548 |
 
 These are single-run microbenchmark observations, not end-to-end suite timings.
 The [validation record](docs/wistia-six-file-validation.json) includes the initial runs; the [follow-up record](docs/wistia-wave2-fixes-validation.json)
 includes the second compatibility smoke check; the
 [review-fix record](docs/wistia-review-fixes-validation.json) includes the first review run.
-The [second review-fix record](docs/wistia-review2-fixes-validation.json) includes the latest run.
+The [second review-fix record](docs/wistia-review2-fixes-validation.json) includes its review run. The
+[remaining-gaps record](docs/wistia-remaining-gaps-validation.json) includes the latest run.
 
 ## How it works
 

@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "ef33b48",
+  "scope": "Incremental form and template fidelity; custom-element lifecycle remains excluded.",
+  "implemented": [
+    "Option text/value fallback collapses ASCII whitespace while preserving non-ASCII spaces and explicit values.",
+    "Template contents share a lazy inert owner document per active document, including parsed/programmatic/nested templates, deep clones, import/adoption and contents moved into the active document.",
+    "Single/multiple select selectedness updates for default selected attributes, explicit setters/index/value clearing, size/multiple changes, option/optgroup insertion/removal and innerHTML replacement.",
+    "FormData fires a synchronous bubbling noncancelable formdata event with mutable entries and a recursive-construction guard; FormDataEvent and onformdata are exposed.",
+    "FormData includes dirname entries after successful text controls, with inherited/existing explicit direction and auto detection for common Hebrew/Arabic versus other letter text."
+  ],
+  "validation": {
+    "new_regression_file": "test/forms-template-fidelity.test.mjs",
+    "new_regression_tests": 12,
+    "focused_command": "ASDF_NODEJS_VERSION=24.19.0 node --test test/forms-template-fidelity.test.mjs test/formdata-construction.test.mjs test/window-messaging.test.mjs",
+    "focused_tests_passed": 49,
+    "jsdom_oracle": "Tests compare option whitespace and ordinary dynamic select transitions with installed jsdom; template ownership also probed directly. jsdom selectedOptions stale-cache and duplicate-value select.value quirks are not copied."
+  },
+  "performance_scope": "No new per-node allocation in query/selectormatching paths. Inert template document is lazy. Template buffer content retains lazy node inflation; cross-document adoption materializes only adopted content and discards iframe lifetimes once per adopted subtree.",
+  "remaining_limits": [
+    "No form-associated custom elements or ElementInternals.",
+    "File serialization consumes an existing files collection; a first-class FileList, native file chooser and complete upload-control lifecycle are not added.",
+    "Legacy object/plugin form controls are not emulated.",
+    "dir=auto uses first-letter classification for common Hebrew/Arabic text; this is not the full Unicode bidi algorithm or the complete HTML directionality algorithm.",
+    "This is ordinary select-state support, not every edge of modern customizable select content or every malformed-tree option ownership rule.",
+    "Native/full-Wistia integration validation is performed by the parent after all parallel runtime changes are integrated."
+  ],
+  "integrated_validation": "wistia-remaining-gaps-validation.json"
+}

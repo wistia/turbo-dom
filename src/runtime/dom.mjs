@@ -160,8 +160,9 @@ export class Node extends EventTarget {
     if (ref && i === -1) throw new Error('NotFoundError: ref is not a child');
     if (ref) kids.splice(i, 0, node); else kids.push(node);
     node.parentNode = this;
-    node.ownerDocument = this.ownerDocument;
+    if (node.ownerDocument !== this.ownerDocument) adoptInto(node, this.ownerDocument);
     notifyMutation(this, 'childList', node, null, ref || null);
+    updateSelectAfterMutation(this);
     return node;
   }
 
@@ -171,9 +172,11 @@ export class Node extends EventTarget {
     if (i === -1) throw new Error('NotFoundError: node is not a child');
     const next = kids[i + 1] || null;
     clearRemovedFocus(node);
+    this.ownerDocument?.__discardFrames?.(node);
     kids.splice(i, 1);
     node.parentNode = null;
     notifyMutation(this, 'childList', null, node, next);
+    updateSelectAfterMutation(this);
     return node;
   }
 
@@ -300,7 +303,10 @@ export class Node extends EventTarget {
   __detachKids() {
     clearRemovedFocus(this, true);
     const kids = this.__kids;
-    if (kids) for (let i = 0; i < kids.length; i++) kids[i].parentNode = null;
+    if (kids) for (let i = 0; i < kids.length; i++) {
+      this.ownerDocument?.__discardFrames?.(kids[i]);
+      kids[i].parentNode = null;
+    }
   }
 
   // Element/Document/Fragment nodeValue is null per spec (CharacterData overrides).
@@ -433,7 +439,7 @@ export class Element extends Node {
   }
 
   get content() {
-    if (this.__content === undefined) this.__content = new DocumentFragment(this.ownerDocument);
+    if (this.__content === undefined) this.__content = new DocumentFragment(this.ownerDocument.__templateContentsOwner());
     return this.__content;
   }
   set content(value) { this.__content = value; }
@@ -475,6 +481,8 @@ export class Element extends Node {
     const old = a ? a.value : null;
     if (a) a.value = String(value);
     else this.__attrs.push({ name, value: String(value), prefix: '' });
+    if (this.localName === 'iframe' && name === 'srcdoc') this.ownerDocument.__discardFrames?.(this);
+    updateSelectAfterAttribute(this, name);
     notifyMutation(this, 'attributes', null, null, null, name, old);
   }
   removeAttribute(name) {
@@ -482,7 +490,11 @@ export class Element extends Node {
     if (this.__attrs === undefined) this.__attrs = this.__buildAttrs();
     const a = this.__attrs.find((x) => x.name === name);
     this.__attrs = this.__attrs.filter((x) => x.name !== name);
-    if (a) notifyMutation(this, 'attributes', null, null, null, name, a.value);
+    if (a) {
+      if (this.localName === 'iframe' && name === 'srcdoc') this.ownerDocument.__discardFrames?.(this);
+      updateSelectAfterAttribute(this, name);
+      notifyMutation(this, 'attributes', null, null, null, name, a.value);
+    }
   }
   toggleAttribute(name, force) {
     const has = this.hasAttribute(name);
@@ -558,12 +570,11 @@ export class Element extends Node {
   get value() {
     const t = this.localName;
     if (t === 'select') {
-      const list = Array.from(this.getElementsByTagName('option'));
-      const s = list.find((o) => o.selected);
-      if (s) return s.value;
-      return list.length && !this.multiple ? list[0].value : '';
+      normalizeSelect(this);
+      for (const option of this.options) if (option.__selected) return option.value;
+      return '';
     }
-    if (t === 'option') return this.hasAttribute('value') ? this.getAttribute('value') : this.textContent;
+    if (t === 'option') return this.hasAttribute('value') ? this.getAttribute('value') : this.text;
     // textarea has no value attribute — its raw value defaults to the child text
     // content (the WHATWG "default value") until edited; input falls back to the
     // value attribute (defaultValue).
@@ -573,7 +584,17 @@ export class Element extends Node {
   }
   set value(x) {
     const t = this.localName;
-    if (t === 'select') { for (const o of this.getElementsByTagName('option')) o.selected = (o.value === String(x)); return; }
+    if (t === 'select') {
+      let found = false;
+      const value = String(x);
+      for (const option of this.options) {
+        option.__selected = !found && option.value === value;
+        option.__selectedDirty = true;
+        if (option.__selected) found = true;
+      }
+      this.__selectionInitialized = true;
+      return;
+    }
     if (t === 'option') { this.setAttribute('value', x); return; }
     // typed <input> runs the WHATWG value-sanitization algorithm: a value that
     // isn't valid for date/time/number/etc becomes the EMPTY string (not the prior
@@ -675,34 +696,45 @@ export class Element extends Node {
   set alt(x) { this.setAttribute('alt', x); }
 
   // option
-  get selected() { return this.__selected !== undefined ? this.__selected : this.hasAttribute('selected'); }
-  set selected(x) {
-    this.__selected = !!x;
-    // single-select: selecting one option deselects the others (exclusive)
-    if (x && this.localName === 'option') {
-      let sel = this.parentNode;
-      while (sel && sel.localName !== 'select') sel = sel.parentNode;
-      if (sel && !sel.multiple) {
-        for (const o of sel.getElementsByTagName('option')) if (o !== this) o.__selected = false;
+  get selected() {
+    const select = optionSelect(this);
+    if (select) normalizeSelect(select);
+    return this.__selected !== undefined ? this.__selected : this.hasAttribute('selected');
+  }
+  set selected(value) {
+    const select = optionSelect(this);
+    if (select) normalizeSelect(select);
+    this.__selected = Boolean(value);
+    this.__selectedDirty = true;
+    if (select) {
+      if (this.__selected && !select.multiple) {
+        for (const option of select.options) if (option !== this) option.__selected = false;
       }
+      normalizeSelect(select, true);
     }
   }
   get defaultSelected() { return this.hasAttribute('selected'); }
-  get text() { return this.textContent; }
+  set defaultSelected(value) { if (value) this.setAttribute('selected', ''); else this.removeAttribute('selected'); }
+  get text() { return this.localName === 'option' ? this.textContent.replace(/[\t\n\f\r ]+/g, ' ').replace(/^ | $/g, '') : this.textContent; }
   set text(v) { this.textContent = v; }
 
   // select
   get options() { return this.localName === 'select' ? this.getElementsByTagName('option') : undefined; }
   get multiple() { return this.hasAttribute('multiple'); }
   set multiple(x) { if (x) this.setAttribute('multiple', ''); else this.removeAttribute('multiple'); }
-  get selectedOptions() { return Array.from(this.getElementsByTagName('option')).filter((o) => o.selected); }
+  get selectedOptions() { normalizeSelect(this); return Array.from(this.options).filter(option => option.__selected); }
   get selectedIndex() {
-    const list = Array.from(this.getElementsByTagName('option'));
-    const i = list.findIndex((o) => o.selected);
-    if (i >= 0) return i;
-    return list.length && !this.multiple ? 0 : -1;
+    normalizeSelect(this);
+    let index = 0;
+    for (const option of this.options) { if (option.__selected) return index; index++; }
+    return -1;
   }
-  set selectedIndex(idx) { Array.from(this.getElementsByTagName('option')).forEach((o, i) => { o.selected = (i === Number(idx)); }); }
+  set selectedIndex(value) {
+    let index = 0;
+    const selected = Number(value);
+    for (const option of this.options) { option.__selected = index++ === selected; option.__selectedDirty = true; }
+    this.__selectionInitialized = true;
+  }
 
   get style() {
     // minimal honest CSSOM: parse/serialize the inline style attribute
@@ -777,10 +809,11 @@ export class Element extends Node {
     target.__touch();
     for (const rawChild of frag.children) {
       if (rawChild.nodeType === DOCUMENT_FRAGMENT_NODE && rawChild.name === 'content') continue;
-      const child = this.ownerDocument.__inflateNested(rawChild);
+      const child = target.ownerDocument.__inflateNested(rawChild);
       child.parentNode = target;
       target.__kids.push(child);
     }
+    updateSelectAfterMutation(target);
   }
   get outerHTML() { return serializeOuter(this); }
   get innerText() { return this.textContent; }
@@ -803,6 +836,7 @@ export class Element extends Node {
   cloneNode(deep = false) {
     const el = newElement(this.ownerDocument, this.localName, this.__ns);
     el.__attrs = (this.__attrs ?? (this.__attrs = this.__buildAttrs())).map((a) => ({ ...a }));
+    if (this.localName === 'option') { el.__selected = this.__selected; el.__selectedDirty = this.__selectedDirty; }
     if (deep) {
       if (this.content) el.content = this.content.cloneNode(true);
       // build the cloned child array directly — the clone is detached, so per-child
@@ -1515,7 +1549,8 @@ function makeStyle(el) {
     for (const decl of splitDeclarations(text)) {
       const i = decl.indexOf(':');
       if (i === -1) continue;
-      const prop = decl.slice(0, i).trim();
+      const authoredProp = decl.slice(0, i).trim();
+      const prop = authoredProp.startsWith('--') ? authoredProp : authoredProp.toLowerCase();
       let val = decl.slice(i + 1).trim();
       if (!prop) continue;
       const m = /\s*!\s*important\s*$/i.exec(val);
@@ -1529,7 +1564,7 @@ function makeStyle(el) {
   const serialize = ({ values, prio }) => [...values].map(([k, v]) => `${k}: ${normalizeZeroLengths(k, v)}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; ');
   const write = (style) => {
     for (const [property, value] of style.values) {
-      if (!property.startsWith('--')) style.values.set(property, value.trim());
+      style.values.set(property, value.trim());
     }
     const text = serialize(style);
     el.setAttribute('style', text);
@@ -1622,22 +1657,70 @@ function makeDataset(el) {
   });
 }
 
+function optionSelect(option) {
+  if (option.localName !== 'option') return null;
+  let parent = option.parentNode;
+  if (parent?.localName === 'optgroup') parent = parent.parentNode;
+  return parent?.localName === 'select' ? parent : null;
+}
+
+function normalizeSelect(select, force = false) {
+  if (!force && select.__selectionInitialized) return;
+  const options = select.options;
+  let last = null;
+  for (const option of options) {
+    if (option.__selected === undefined) option.__selected = option.hasAttribute('selected');
+    if (option.__selected) last = option;
+  }
+  if (!select.multiple) {
+    if (last) {
+      for (const option of options) option.__selected = option === last;
+    } else if (!(Number(select.getAttribute('size')) > 1)) {
+      for (const option of options) {
+        if (!option.disabled && !(option.parentElement?.localName === 'optgroup' && option.parentElement.disabled)) {
+          option.__selected = true;
+          break;
+        }
+      }
+    }
+  }
+  select.__selectionInitialized = true;
+}
+
+function updateSelectAfterMutation(parent) {
+  const tag = parent.localName;
+  if (tag === 'select') normalizeSelect(parent, true);
+  else if (tag === 'optgroup' && parent.parentNode?.localName === 'select') normalizeSelect(parent.parentNode, true);
+}
+
+function updateSelectAfterAttribute(element, name) {
+  if (element.localName === 'option' && name === 'selected') {
+    if (!element.__selectedDirty) element.__selected = element.hasAttribute('selected');
+    const select = optionSelect(element);
+    if (select) normalizeSelect(select, true);
+  } else if (element.localName === 'select' && (name === 'multiple' || name === 'size')) {
+    normalizeSelect(element, true);
+  }
+}
+
 // adoptNode/importNode helper: a buffer-backed node carries __idx/__attrIdx into
 // the SoA buffer of its ORIGINAL document. Re-homing it to another document would
 // leave those indices reading through the NEW document's buffer (wrong/garbage, or
 // corruption). Materialize attrs + children off the current buffer FIRST, then sever
 // the buffer linkage, then switch ownerDocument — depth-first so each level reads its
 // own (old) buffer before being re-homed.
-function adoptInto(node, doc) {
+function adoptInto(node, doc, discardFrames = true) {
   if (node.ownerDocument === doc) return;
   if (node.nodeType === ELEMENT_NODE) {
     if (node.__attrs === undefined && node.__attrIdx >= 0) node.__attrs = node.__buildAttrs();
     node.__attrIdx = -1;
   }
+  if (discardFrames) node.ownerDocument?.__discardFrames?.(node);
   const kids = node.__children ? node.__children() : []; // inflate off the OLD buffer
   node.__idx = -1;
   node.ownerDocument = doc;
-  for (const c of kids) adoptInto(c, doc);
+  for (const c of kids) adoptInto(c, doc, false);
+  if (node.__content) adoptInto(node.__content, doc.__templateContentsOwner(), false);
 }
 
 // --- MutationObserver, wired to the mutation methods above via notifyMutation ---
@@ -1759,7 +1842,7 @@ export class Document extends Node {
         if (tag === 'template') {
           for (let c = buf.firstChild(idx); c !== -1; c = buf.nextSib(c)) {
             if (buf.nodeType(c) === DOCUMENT_FRAGMENT_NODE && buf.tagName(c) === 'content') {
-              node.content = this.__nodeAt(c);
+              node.content = this.__templateContentsOwner().__nodeAt(c);
               break;
             }
           }
@@ -1788,7 +1871,7 @@ export class Document extends Node {
         node.__attrs = raw.attrs.map((a) => ({ name: a.name, value: a.value, prefix: a.prefix || '' }));
         if (raw.name === 'template') {
           const contentRaw = raw.children.find((c) => c.nodeType === DOCUMENT_FRAGMENT_NODE && c.name === 'content');
-          if (contentRaw) { node.content = this.__inflateNested(contentRaw); }
+          if (contentRaw) { node.content = this.__templateContentsOwner().__inflateNested(contentRaw); }
         }
         break;
       case TEXT_NODE: node = new Text(this, raw.value); break;
@@ -1812,6 +1895,7 @@ export class Document extends Node {
 
   // Layer 5: (re)point at the SoA buffer; children inflate lazily. Arena reset.
   __load(soa) {
+    this.__templateDocument = null;
     this.__buf = new Buffer(soa);
     this.__idx = 0;          // node 0 is the document
     this.__kids = null;      // drop overlay
@@ -1841,6 +1925,17 @@ export class Document extends Node {
     return styleSheetList(sheets);
   }
 
+  __templateContentsOwner() {
+    if (this.__isTemplateDocument) return this;
+    if (!this.__templateDocument) {
+      const document = new Document();
+      document.__isTemplateDocument = true;
+      document.__buf = this.__buf;
+      this.__templateDocument = document;
+    }
+    return this.__templateDocument;
+  }
+
   // ---- factories (owned nodes, no buffer) ----
   createElement(tag) { return newElement(this, String(tag).toLowerCase(), ''); }
   createElementNS(ns, qualified) {
@@ -1864,7 +1959,7 @@ export class Document extends Node {
   createRange() { return new Range(this); }
   createAttribute(name) { return { name, value: '', ownerElement: null }; }
   getSelection() { if (!this.__selection) this.__selection = makeSelection(this); return this.__selection; }
-  importNode(node, deep) { return node.cloneNode(deep); }
+  importNode(node, deep) { const clone = node.cloneNode(deep); adoptInto(clone, this); return clone; }
   adoptNode(node) { if (node.parentNode) node.parentNode.removeChild(node); adoptInto(node, this); return node; }
 
   // TreeWalker / NodeIterator (whatToShow: 1 elements, 4 text, 0xFFFFFFFF all)

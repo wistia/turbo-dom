@@ -9,9 +9,10 @@
 // HONEST: this only ever returns values that come from a REAL matched rule or inline
 // style (or inherited from one — see INHERITED). A property no stylesheet/inline set
 // still reads '' — it never invents layout/cascade numbers or initial values. Out of
-// scope (return ''): @media/@supports/@keyframes, :hover & other stateful
-// pseudo-classes, pseudo-elements, the `inherit`/`initial`/`unset` keywords,
-// CSS custom-property resolution. Colors ARE canonicalized to rgb()/rgba() (color.mjs)
+// scope: @media/@supports/@keyframes, stateful pseudo-classes, pseudo-elements,
+// initial-value defaults, and var() substitution. Explicit inherit/unset can use
+// real parent declarations; initial values stay absent. Custom properties inherit
+// with case-sensitive names. Colors are canonicalized to rgb()/rgba() (color.mjs)
 // and bare-0 lengths to `0px`, matching what a browser serializes.
 
 import { matchesSelector } from './selectors.mjs';
@@ -32,13 +33,19 @@ const BORDER_STYLES = new Set(['none', 'hidden', 'dotted', 'dashed', 'solid', 'd
 // Expand the common shorthands into longhands so longhand computed getters resolve
 // (e.g. `border:1px solid` → borderWidth '1px'). Cheap, test-time only; later
 // declarations of the same longhand override naturally (cascade order preserved).
-function setProp(map, name, val) {
+function assignProp(map, name, val, important = false) {
+  if (!important && map.__important?.has(name)) return;
+  if (important) (map.__important ||= new Set()).add(name);
   map.set(name, val);
+}
+
+function setProp(map, name, val, important = false) {
+  assignProp(map, name, val, important);
   if (name === 'margin' || name === 'padding') {
     const t = val.trim().split(/\s+/);
     const top = t[0], right = t[1] ?? top, bottom = t[2] ?? top, left = t[3] ?? right;
-    map.set(name + '-top', top); map.set(name + '-right', right);
-    map.set(name + '-bottom', bottom); map.set(name + '-left', left);
+    assignProp(map, name + '-top', top, important); assignProp(map, name + '-right', right, important);
+    assignProp(map, name + '-bottom', bottom, important); assignProp(map, name + '-left', left, important);
   } else if (name === 'border') {
     let width, style, color;
     for (const p of val.trim().split(/\s+/)) {
@@ -46,11 +53,11 @@ function setProp(map, name, val) {
       else if (/^(thin|medium|thick)$/.test(p) || /^[\d.]+(px|em|rem|%|pt|vh|vw)?$/.test(p)) width = p;
       else color = p;
     }
-    if (width !== undefined) { map.set('border-width', width); for (const s of ['top', 'right', 'bottom', 'left']) map.set(`border-${s}-width`, width); }
-    if (style !== undefined) map.set('border-style', style);
-    if (color !== undefined) map.set('border-color', color);
+    if (width !== undefined) { assignProp(map, 'border-width', width, important); for (const s of ['top', 'right', 'bottom', 'left']) assignProp(map, `border-${s}-width`, width, important); }
+    if (style !== undefined) assignProp(map, 'border-style', style, important);
+    if (color !== undefined) assignProp(map, 'border-color', color, important);
   } else if (name === 'background' && !/\s/.test(val.trim())) {
-    map.set('background-color', val.trim());
+    assignProp(map, 'background-color', val.trim(), important);
   }
 }
 
@@ -59,9 +66,12 @@ function parseDecls(text, into) {
   for (const decl of splitDeclarations(text)) {
     const c = decl.indexOf(':');
     if (c === -1) continue;
-    const name = decl.slice(0, c).trim().toLowerCase();
-    if (!name) continue;
-    setProp(map, name, decl.slice(c + 1).trim().replace(/\s*!\s*important\s*$/i, ''));
+    const authoredName = decl.slice(0, c).trim();
+    if (!authoredName) continue;
+    const name = authoredName.startsWith('--') ? authoredName : authoredName.toLowerCase();
+    const value = decl.slice(c + 1).trim();
+    const priority = /\s*!\s*important\s*$/i.exec(value);
+    setProp(map, name, priority ? value.slice(0, priority.index).trim() : value, !!priority);
   }
   return map;
 }
@@ -184,7 +194,7 @@ function flattenedParent(el) {
 
 function applyMatched(matched, out) {
   matched.sort((x, y) => x.spec - y.spec || x.order - y.order);
-  for (const r of matched) for (const [k, val] of r.decls) out.set(k, val);
+  for (const r of matched) for (const [k, val] of r.decls) assignProp(out, k, val, r.decls.__important?.has(k));
 }
 
 function lookup(map, prop) {
@@ -209,14 +219,15 @@ function makeProxy(map, v) {
   return new Proxy({}, {
     get(_t, key) {
       if (key === '__v') return v;
+      if (key === '__map') return map;
       if (key === '__honest') return 'computed style resolves injected <style> + inline; no layout/@media/state';
-      if (key === 'getPropertyValue') return (p) => lookup(map, String(p).toLowerCase());
+      if (key === 'getPropertyValue') return (p) => { const name = String(p); return lookup(map, name.startsWith('--') ? name : name.toLowerCase()); };
       if (key === 'getPropertyPriority') return () => '';
       if (key === 'length') return map.size;
       if (key === 'item') return (i) => [...map.keys()][i] ?? '';
       if (key === Symbol.iterator) { const ks = [...map.keys()]; return ks[Symbol.iterator].bind(ks); }
       if (typeof key !== 'string') return undefined;
-      return lookup(map, kebab(key));
+      return lookup(map, key.startsWith('--') ? key : kebab(key));
     },
   });
 }
@@ -237,10 +248,10 @@ export function makeGetComputedStyle() {
     // Encapsulation: an element inside a shadow tree resolves against that
     // shadow root's own <style> rules, not the document's (and vice-versa).
     // Gated on __hasShadow so the no-shadow path keeps resolving against doc.
-    let scope = doc, inShadow = false;
+    let scope = doc;
     if (doc.__hasShadow) {
       const root = el.getRootNode && el.getRootNode();
-      if (root && root.__isShadowRoot) { scope = root; inShadow = true; }
+      if (root && root.__isShadowRoot) { scope = root; }
     }
 
     const matched = [];
@@ -254,7 +265,7 @@ export function makeGetComputedStyle() {
     }
     applyMatched(matched, map);
 
-    // inline style wins over stylesheet rules
+    // Inline declarations win within the same priority tier.
     const inline = el.getAttribute && el.getAttribute('style');
     if (inline) parseDecls(inline, map);
 
@@ -265,15 +276,27 @@ export function makeGetComputedStyle() {
     // from values a REAL rule/inline actually set (pv truthy) — never an initial
     // value. Recursion is memoized per element/version and terminates at the root
     // (flattenedParent → null). Test-time only; hot paths never call gcs.
-    // `inShadow` is unused now that light-DOM inherits too, but the flattened-parent
-    // hop still crosses the host boundary correctly for shadow content.
-    void inShadow;
     const parent = flattenedParent(el);
     if (parent) {
       const ps = gcs(parent);
       for (const prop of INHERITED) {
         if (!map.has(prop)) { const pv = ps.getPropertyValue(prop); if (pv) map.set(prop, pv); }
       }
+      for (const [prop, value] of ps.__map) {
+        if (prop.startsWith('--') && !map.has(prop)) map.set(prop, value);
+      }
+      for (const [prop, value] of map) {
+        const keyword = value.toLowerCase();
+        if (keyword === 'inherit' || (keyword === 'unset' && (INHERITED.has(prop) || prop.startsWith('--')))) {
+          const inherited = ps.getPropertyValue(prop);
+          if (inherited) map.set(prop, inherited);
+          else map.delete(prop);
+        } else if (keyword === 'initial' || keyword === 'unset') map.delete(prop);
+      }
+    }
+
+    if (!parent) for (const [prop, value] of map) {
+      if (/^(inherit|initial|unset)$/i.test(value)) map.delete(prop);
     }
 
     const proxy = makeProxy(map, v);

@@ -173,7 +173,7 @@ test('cached standard CSSOM writes normalize whitespace consistently with parsed
   assert.equal(actual.style.opacity, '0.75');
   assert.equal(actual.style.getPropertyPriority('opacity'), 'important');
   actual.style.setProperty('--spaced', '  token  ');
-  assert.equal(actual.style.getPropertyValue('--spaced'), '  token  ');
+  assert.equal(actual.style.getPropertyValue('--spaced'), 'token');
 });
 
 test('CSS comments cannot change declaration string or delimiter state', () => {
