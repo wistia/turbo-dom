@@ -24,6 +24,21 @@ export function normalizeZeroLengths(property, value) {
   return trimmed.replace(ZERO_LENGTH, (_, separator) => `${separator}0px`);
 }
 
+export function resolveViewportLength(property, value, width, height) {
+  if (!LENGTH_PROPS.has(property)) return value;
+  const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(vw|vh|vmin|vmax)$/i.exec(value);
+  if (!match) return value;
+  let dimension;
+  switch (match[2].toLowerCase()) {
+    case 'vw': dimension = width; break;
+    case 'vh': dimension = height; break;
+    case 'vmin': dimension = Math.min(width, height); break;
+    case 'vmax': dimension = Math.max(width, height); break;
+  }
+  const pixels = Number(match[1]) * dimension / 100;
+  return Number.isFinite(pixels) ? `${pixels}px` : value;
+}
+
 export function backgroundImage(value) {
   const text = value.trim();
   if (canonicalizeColor(text, true) || /^currentcolor$/i.test(text)) return 'none';

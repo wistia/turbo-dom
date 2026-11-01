@@ -7,17 +7,17 @@
 // added to any benchmarked path.
 //
 // HONEST: this only ever returns values that come from a REAL matched rule or inline
-// style (or inherited from one — see INHERITED). A property no stylesheet/inline set
-// still reads '' — it never invents layout/cascade numbers or initial values. Out of
+// style (or inherited from one — see INHERITED). Unset properties read '' except
+// the supported initial overflow value. Scalar viewport lengths resolve to px. Out of
 // scope: @media/@supports/@keyframes, stateful pseudo-classes, pseudo-elements,
-// initial-value defaults, and var() substitution. Explicit inherit/unset can use
+// other initial-value defaults, and var() substitution. Explicit inherit/unset can use
 // real parent declarations; initial values stay absent. Custom properties inherit
 // with case-sensitive names. Colors are canonicalized to rgb()/rgba() (color.mjs)
 // and bare-0 lengths to `0px`, matching what a browser serializes.
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations, backgroundImage } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations, backgroundImage, resolveViewportLength } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -76,7 +76,9 @@ function parseDecls(text, into) {
     const name = authoredName.startsWith('--') ? authoredName : authoredName.toLowerCase();
     const value = decl.slice(c + 1).trim();
     const priority = /\s*!\s*important\s*$/i.exec(value);
-    setProp(map, name, priority ? value.slice(0, priority.index).trim() : value, !!priority);
+    const declaration = priority ? value.slice(0, priority.index).trim() : value;
+    if (!declaration && !name.startsWith('--')) continue;
+    setProp(map, name, declaration, !!priority);
   }
   return map;
 }
@@ -202,14 +204,15 @@ function applyMatched(matched, out) {
   for (const r of matched) for (const [k, val] of r.decls) assignProp(out, k, val, r.decls.__important?.has(k));
 }
 
-function lookup(map, prop) {
+function lookup(map, prop, viewport) {
   let v = map.get(prop);
   if (v === undefined) {
     const sh = SHORTHAND_OF[prop];
     if (sh) { const s = map.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
   }
-  if (v === undefined) return '';
+  if (v === undefined) return viewport && prop === 'overflow' ? 'visible' : '';
   v = normalizeZeroLengths(prop, v);
+  v = resolveViewportLength(prop, v, viewport?.width, viewport?.height);
   // font-family: browsers serialize the list with ", " regardless of source spacing
   // (emotion minifies to "a",b,c). Scoped to font-family so we don't rewrite commas
   // inside rgb()/cubic-bezier() values, which browsers leave compact.
@@ -220,35 +223,41 @@ function lookup(map, prop) {
   return v;
 }
 
-function makeProxy(map, v) {
+function makeProxy(map, v, viewport) {
   return new Proxy({}, {
     get(_t, key) {
       if (key === '__v') return v;
+      if (key === '__viewportWidth') return viewport?.width;
+      if (key === '__viewportHeight') return viewport?.height;
+      if (key === '__document') return viewport?.document;
       if (key === '__map') return map;
       if (key === '__honest') return 'computed style resolves injected <style> + inline; no layout/@media/state';
-      if (key === 'getPropertyValue') return (p) => { const name = String(p); return lookup(map, name.startsWith('--') ? name : name.toLowerCase()); };
+      if (key === 'getPropertyValue') return (p) => { const name = String(p); return lookup(map, name.startsWith('--') ? name : name.toLowerCase(), viewport); };
       if (key === 'getPropertyPriority') return () => '';
       if (key === 'length') return map.size;
       if (key === 'item') return (i) => [...map.keys()][i] ?? '';
       if (key === Symbol.iterator) { const ks = [...map.keys()]; return ks[Symbol.iterator].bind(ks); }
       if (typeof key !== 'string') return undefined;
-      return lookup(map, key.startsWith('--') ? key : kebab(key));
+      return lookup(map, key.startsWith('--') ? key : kebab(key), viewport);
     },
   });
 }
 
 // getComputedStyle(el): resolves cascade, memoized per element on the current
-// Document.__version (any style/DOM mutation bumps it → cache auto-invalidates).
+// Document identity/version and viewport size (style/DOM/viewport changes invalidate).
 export function makeGetComputedStyle() {
   const gcs = (el) => {
     if (!el) return makeProxy(new Map(), -1);
     const doc = el.ownerDocument;
     const v = doc ? (doc.__version || 0) : 0;
+    const width = doc?.defaultView?.innerWidth;
+    const height = doc?.defaultView?.innerHeight;
     const cached = el.__computedStyle;
-    if (cached && cached.__v === v) return cached;
+    if (cached && cached.__v === v && cached.__document === doc && cached.__viewportWidth === width && cached.__viewportHeight === height) return cached;
+    const viewport = { width, height, document: doc };
 
     const map = new Map();
-    if (!doc) { const p = makeProxy(map, v); el.__computedStyle = p; return p; }
+    if (!doc) { const p = makeProxy(map, v, viewport); el.__computedStyle = p; return p; }
 
     // Encapsulation: an element inside a shadow tree resolves against that
     // shadow root's own <style> rules, not the document's (and vice-versa).
@@ -304,7 +313,7 @@ export function makeGetComputedStyle() {
       if (/^(inherit|initial|unset)$/i.test(value)) map.delete(prop);
     }
 
-    const proxy = makeProxy(map, v);
+    const proxy = makeProxy(map, v, viewport);
     el.__computedStyle = proxy;
     return proxy;
   };
