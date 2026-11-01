@@ -122,6 +122,10 @@ package or publish workflow.
   or advancing playback time. `readyState`/`networkState` remain empty, `duration` is `NaN`,
   and `canPlayType()` returns `''`. The scoped prototypes support interface spies without
   exposing canvas dimensions or media controls on ordinary HTML elements.
+- **Computed styles** resolve scalar viewport lengths and use document identity,
+  DOM version and viewport dimensions as cache keys. Initial `overflow` is `visible`;
+  other unset defaults remain partial. Empty standard declarations do not suppress
+  authored stylesheet values. No layout engine or general CSS math evaluation is added.
 - **CSSOM is minimal + test-time only** (`cssom.mjs`): `<style>.sheet` (lazy `__sheet`, only
   emotion-touched styles allocate one) + live `document.styleSheets` + `insertRule`/`deleteRule`.
   `insertRule` bumps `Document.__version` (via owner `__touch()`), and `cascade.mjs` reads

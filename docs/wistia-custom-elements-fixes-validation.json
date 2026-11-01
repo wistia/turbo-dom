@@ -1,0 +1,84 @@
+{
+  "date": "2026-11-01",
+  "tested_fork_commit": "20339cda8946ea6cb6e006e0806fa85acc7301b2",
+  "wistia_fixture_commit": "14282e960150f87719cc92c8189f990f67c03f2b",
+  "scope": "Resolve the three remaining failures in the six-file custom-element validation. Application validation remains limited to docs/wistia-custom-elements-selection.json; no broad samples or runtime comparisons were resumed.",
+  "fixes": [
+    {
+      "issue": "100vw did not resolve to pixels",
+      "change": "Resolve scalar vw/vh/vmin/vmax lengths in computed styles. Preserve authored inline units and unsupported expressions. Cache keys include owner document and viewport dimensions so inherited values and iframe/adoption results refresh correctly."
+    },
+    {
+      "issue": "Drawer cleanup restored empty inline overflow, but computed overflow stayed empty",
+      "change": "Provide the initial computed overflow value visible; ignore empty standard declarations so authored stylesheet overflow still applies after inline restoration. Application scroll-lock/cleanup behavior is unchanged."
+    },
+    {
+      "issue": "The real lazy UI component prevented the lifecycle fixture from completing in both environments",
+      "change": "Use a controlled deferred component for the mocked entry point. Preserve the before/after mount-marker assertions, deferred import and rendered-child checks; the child label also verifies prop delivery. Production React/custom-element and InputPassword components are unchanged.",
+      "coverage_scope": "The lifecycle unit test no longer covers the real InputPassword UI implementation; it isolates the custom-element/lazy-mount contract."
+    }
+  ],
+  "validation": {
+    "focused_custom_element_tests": {
+      "passed": 38,
+      "failed": 0,
+      "new_computed_style_cases": 6,
+      "command": "ASDF_NODEJS_VERSION=24.19.0 node --test test/custom-element-*.test.mjs"
+    },
+    "wistia_selection": "wistia-custom-elements-selection.json",
+    "workers_per_environment": 2,
+    "results": {
+      "jsdom": {
+        "files": 6,
+        "file_states": {
+          "passed": 6
+        },
+        "passed_tests": 82,
+        "failed_tests": 0,
+        "skipped_tests": 0,
+        "todo_tests": 7,
+        "total_cases": 89
+      },
+      "fork": {
+        "files": 6,
+        "file_states": {
+          "passed": 6
+        },
+        "passed_tests": 82,
+        "failed_tests": 0,
+        "skipped_tests": 0,
+        "todo_tests": 7,
+        "total_cases": 89
+      }
+    },
+    "identical_test_names_and_statuses": true,
+    "fixture_lint": "yarn lint:file frontend/webComponents/react-component.vitest.jsx passed",
+    "mandatory_fork_commit_hook": {
+      "passed_tests": 729,
+      "skipped_tests": 4,
+      "failed_tests": 0,
+      "coverage_percent": {
+        "lines": 99.33,
+        "branches": 95.93,
+        "functions": 98.33
+      },
+      "note": "Existing repository coverage/conformance gate runs automatically on source commits."
+    }
+  },
+  "remaining_limits": [
+    "Viewport resolution covers scalar length values. calc()/min()/max()/clamp(), percentages, container units and the full layout engine remain unsupported or unchanged.",
+    "Only the overflow shorthand initial value is supplied; this does not add a full CSS initial-value catalog or overflow-axis coupling.",
+    "Computed styles retain the runtime snapshot/cache model; complete browser-live CSSStyleDeclaration behavior is not implemented.",
+    "Customized built-ins, ElementInternals, scoped registries and other previously documented autonomous-custom-element limitations remain.",
+    "No new end-to-end performance claims; the comparison remains stopped."
+  ],
+  "reproduction": "ASDF_NODEJS_VERSION=24.19.0 node bench/wistia-compatibility.mjs --wistia PATH --files docs/wistia-custom-elements-selection.json --output OUTPUT --workers 2",
+  "files": [
+    "frontend/webComponents/react-component.vitest.jsx",
+    "frontend/singlePageApp/components/TagManager/mountTagManager.vitest.ts",
+    "frontend/singlePageApp/screens/PlaylistCustomizeRedesign/components/PlaylistEmbed.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useOverlayWistiaPlayer.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Video/SharedMediaAuroraEmbed.vitest.tsx",
+    "frontend/singlePageApp/screens/AnonymousMedia/layouts/BaseLayout.vitest.tsx"
+  ]
+}
