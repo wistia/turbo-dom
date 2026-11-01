@@ -1,0 +1,812 @@
+{
+  "date": "2026-11-01",
+  "tested_fork_commit": "081fbbabb8ed809171e8d5b6b094cc2787599499",
+  "wistia_commit": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+  "versions": {
+    "node": "24.19.0",
+    "vitest": "5.0.4",
+    "jsdom": "30.1.3",
+    "turbo_dom_fork": "0.5.8"
+  },
+  "workers_per_condition": 3,
+  "results": {
+    "jsdom": {
+      "files": 201,
+      "passed_files": 198,
+      "failed_files": 1,
+      "skipped_files": 2,
+      "total_test_cases": 1789,
+      "passed_tests": 1770,
+      "failed_tests": 1,
+      "skipped_tests": 7,
+      "todo_tests": 11
+    },
+    "fork": {
+      "files": 201,
+      "passed_files": 191,
+      "failed_files": 8,
+      "skipped_files": 2,
+      "total_test_cases": 1789,
+      "passed_tests": 1712,
+      "failed_tests": 59,
+      "skipped_tests": 7,
+      "todo_tests": 11
+    }
+  },
+  "fork_only_regression_files": 7,
+  "fork_only_failed_tests": 58,
+  "findings": [
+    {
+      "issue": "Canvas dimensions and color-picker rendering",
+      "files": [
+        "frontend/components/BackgroundColorPicker/BackgroundColorPicker.vitest.tsx",
+        "frontend/components/ColorPicker/ColorPicker.vitest.tsx",
+        "frontend/singlePageApp/components/DropdownColorPicker/DropdownColorPicker.vitest.tsx"
+      ],
+      "evidence": "Canvas width and height are undefined even with attributes; Wistia\u2019s native canvas clearRect rejects those undefined f64 arguments. DropdownColorPicker also errors in HSVSaturationValueCanvas and HSVHueCanvas before its input can render.",
+      "failed_tests": 28
+    },
+    {
+      "issue": "Missing window.postMessage",
+      "files": [
+        "frontend/mcpAppSandbox/sandboxProxy.vitest.ts"
+      ],
+      "evidence": "vi.spyOn(window, postMessage) fails because the property is absent; direct probe confirms it.",
+      "failed_tests": 12
+    },
+    {
+      "issue": "Missing HTMLMediaElement.prototype.play",
+      "files": [
+        "frontend/singlePageApp/hooks/useMotionKitCompletionNotifications.vitest.ts"
+      ],
+      "evidence": "Media playback spy setup fails because play is absent; direct probe confirms the missing method.",
+      "failed_tests": 11
+    },
+    {
+      "issue": "FormData(form) does not serialize controls",
+      "files": [
+        "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx"
+      ],
+      "evidence": "Submitted category values become null; a direct form/input probe produces the value under jsdom but null under the fork.",
+      "failed_tests": 3
+    },
+    {
+      "issue": "CSS zero-length serialization differs between inline and computed style",
+      "files": [
+        "frontend/onboarding/components/FancyTooltip/FancyTooltip.vitest.tsx"
+      ],
+      "evidence": "Inline style.left=0 reads back as 0 in the fork while computed style returns 0px. jsdom returns 0px for both; toHaveStyle comparisons fail.",
+      "failed_tests": 4
+    }
+  ],
+  "additional_probe_finding": {
+    "issue": "Custom-element construction and connected lifecycle callbacks are absent",
+    "evidence": "The registered class is instantiated and connected once under jsdom; neither occurs under the fork. The Wistia react-component test fails under both environments at different stages, so it is excluded from the fork-only regression count.",
+    "classification": "Browser API gap independently confirmed by a minimal probe; the related Wistia test is not a clean baseline."
+  },
+  "focused_rerun": {
+    "files": 8,
+    "workers_per_condition": 1,
+    "jsdom": {
+      "passed_tests": 88,
+      "failed_tests": 1
+    },
+    "fork": {
+      "passed_tests": 30,
+      "failed_tests": 59
+    }
+  },
+  "direct_api_probes": {
+    "jsdom": {
+      "canvas_default": {
+        "width": 300,
+        "height": 150
+      },
+      "canvas_attributes": {
+        "width": 120,
+        "height": 80
+      },
+      "window_postMessage": "function",
+      "media_play": "function",
+      "form_data_category": "business--marketing",
+      "zero_css": {
+        "inline_left": "0px",
+        "computed_left": "0px"
+      },
+      "custom_element": {
+        "constructed": true,
+        "connected_calls": 1
+      }
+    },
+    "fork": {
+      "canvas_default": {
+        "width": "undefined",
+        "height": "undefined"
+      },
+      "canvas_attributes": {
+        "width": "undefined",
+        "height": "undefined"
+      },
+      "window_postMessage": "undefined",
+      "media_play": "undefined",
+      "form_data_category": null,
+      "zero_css": {
+        "inline_left": "0",
+        "computed_left": "0px"
+      },
+      "custom_element": {
+        "constructed": false,
+        "connected_calls": 0
+      }
+    }
+  },
+  "regressions": [
+    {
+      "file": "frontend/mcpAppSandbox/sandboxProxy.vitest.ts",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 12,
+      "failures": [
+        {
+          "test": "installSandboxProxy mounts a placeholder frame with the fixed sandbox attribute and announces readiness to the host origin only",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy loads the app into a fresh same-origin frame with its permissions when the host says it is ready",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy never honors a sandbox override carried by the host message",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy relays host messages into the app targeted at its own origin",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy drops host messages until an app has been loaded",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy ignores host-sourced messages from any other origin",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy relays app messages to the host origin with the user activation they carry",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy drops app-sourced messages from any other origin, opaque ones included",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy drops same-origin messages that do not come from the current app frame",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy stops relaying in both directions once the app navigates its frame elsewhere",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy reopens the channel when the host loads a new app",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        },
+        {
+          "test": "installSandboxProxy stops relaying after dispose",
+          "message": "Error: The property \"postMessage\" is not defined on the object."
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/components/BackgroundColorPicker/BackgroundColorPicker.vitest.tsx",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 3,
+      "failures": [
+        {
+          "test": "BackgroundColorPicker custom color mode calls onChangeSelectedBackgroundColor when custom color changes",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "BackgroundColorPicker onCommitSelectedBackgroundColor fires with the current color when the custom color popover closes",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "BackgroundColorPicker onCommitSelectedBackgroundColor does not fire while typing in the hex input in custom mode",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/components/ColorPicker/ColorPicker.vitest.tsx",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 23,
+      "failures": [
+        {
+          "test": "ColorPicker popover mode opens popover when trigger is clicked",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode shows contrast controls in popover when enabled",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode hides contrast controls in popover when disabled",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode brand colors renders brand colors when enabled and brand colors exist",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode brand colors uses a custom brand-colors label when provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode suggested colors renders the suggested colors when provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode suggested colors does not render suggested colors when none are provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode custom color options renders custom color options list",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode custom color options renders grouped color options",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode custom color options does not render color options when none provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker popover mode calls onValueChange callback",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode renders the UI inline, i.e. without needing to click the trigger first",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode shows contrast controls in inline mode when enabled",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode hides contrast controls in inline mode when disabled",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode brand colors renders brand colors when enabled and brand colors exist",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode brand colors does not render brand colors when disabled",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode brand colors does not render brand colors when none exist",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode suggested colors renders the suggested colors when provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode suggested colors does not render suggested colors when none are provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode custom color options renders custom color options list",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode custom color options renders grouped color options",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode custom color options does not render color options when none provided",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        },
+        {
+          "test": "ColorPicker inline mode calls onValueChange callback",
+          "message": "Error: Failed to convert napi value Undefined into rust type `f64`"
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/singlePageApp/hooks/useMotionKitCompletionNotifications.vitest.ts",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 11,
+      "failures": [
+        {
+          "test": "useMotionKitCompletionNotifications toasts and chimes on another page",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications stays silent on the kit's chat with the tab active",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications chimes without a toast on the kit's chat when the tab is inactive",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications toasts and chimes from a different chat",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications follows route changes after mount",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications announces a redelivered kit only once",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications announces a kit again when a revision re-promotes it later",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications toasts each of two kits but chimes once for the burst",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications refreshes the kit lists when a kit finishes",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications refreshes the kit lists on the kit's chat with the tab active",
+          "message": "Error: The property \"play\" is not defined on the object."
+        },
+        {
+          "test": "useMotionKitCompletionNotifications refreshes the kit lists once for a redelivered kit",
+          "message": "Error: The property \"play\" is not defined on the object."
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/onboarding/components/FancyTooltip/FancyTooltip.vitest.tsx",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 4,
+      "failures": [
+        {
+          "test": "FancyTooltip renders to the left",
+          "message": "Error: expect(element).toHaveStyle()\n\n- Expected\n\n- left: 0;\n+ left: 0px;"
+        },
+        {
+          "test": "FancyTooltip renders to the right",
+          "message": "Error: expect(element).toHaveStyle()\n\n- Expected\n\n- right: 0;\n+ right: 0px;"
+        },
+        {
+          "test": "FancyTooltip renders to the top",
+          "message": "Error: expect(element).toHaveStyle()\n\n- Expected\n\n- top: 0;\n+ top: 0px;"
+        },
+        {
+          "test": "FancyTooltip renders to the bottom",
+          "message": "Error: expect(element).toHaveStyle()\n\n- Expected\n\n- bottom: 0;\n+ bottom: 0px;"
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/singlePageApp/components/DropdownColorPicker/DropdownColorPicker.vitest.tsx",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 2,
+      "failures": [
+        {
+          "test": "DropdownColorPicker allows typing a hex code into the custom color input inside the menu",
+          "message": "Error: Unable to find an element with the display value: #123456."
+        },
+        {
+          "test": "DropdownColorPicker closes the menu when Escape is pressed inside the custom color input",
+          "message": "Error: Unable to find an element with the display value: #123456."
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    },
+    {
+      "file": "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx",
+      "jsdom_status": "passed",
+      "fork_status": "failed",
+      "failed_tests": 3,
+      "failures": [
+        {
+          "test": "Categorization submits category1 from the parent-provided value",
+          "message": "AssertionError: expected null to be 'business--marketing' // Object.is equality"
+        },
+        {
+          "test": "Categorization submits all three categories when all are populated",
+          "message": "AssertionError: expected null to be 'business--marketing' // Object.is equality"
+        },
+        {
+          "test": "Categorization submits 'nil' for category1 when no category is selected so validation can flag it",
+          "message": "AssertionError: expected null to be 'nil' // Object.is equality"
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "passed",
+        "fork": "failed"
+      }
+    }
+  ],
+  "shared_baseline_failures": [
+    {
+      "file": "frontend/webComponents/react-component.vitest.jsx",
+      "jsdom_failures": [
+        {
+          "test": "react-component marks the element as mounted once the lazy component has rendered",
+          "message": "Error: expect(element).toHaveAttribute(\"data-react-mounted\") // element.hasAttribute(\"data-react-mounted\")\n\nExpected the element to have attribute:\n  data-react-mounted\nReceived:\n  null"
+        }
+      ],
+      "fork_failures": [
+        {
+          "test": "react-component marks the element as mounted once the lazy component has rendered",
+          "message": "AssertionError: expected \"vi.fn()\" to be called with arguments: []\n\nNumber of calls: 0"
+        }
+      ],
+      "focused_rerun": {
+        "jsdom": "failed",
+        "fork": "failed"
+      },
+      "classification": "Fails under both environments; excluded from fork-only test regression count."
+    }
+  ],
+  "methodology": [
+    "A deterministic feature-stratified sample outside all filenames identifiable in earlier completed reports, interrupted-run logs and Vitest cache.",
+    "The initial 200 filters matched one additional TSX companion. The manifest includes all 201 actual files, none in the known exclusion inventory.",
+    "The same files and test-case inventory ran against jsdom and the fork. Wistia test sources and setup mocks were unchanged; temporary environment configurations selected the adapter.",
+    "Both conditions ran concurrently for compatibility discovery; these runs are not performance benchmarks.",
+    "All eight failing fork files were repeated under both environments with one worker per condition. Seven files pass under jsdom and fail under the fork in both runs.",
+    "CI=1 uses the previously prepared generated GraphQL artifacts and skips Rails regeneration."
+  ],
+  "limits": [
+    "Earlier interrupted full sweeps did not retain complete inventories, so files never mentioned in their logs cannot be proven untouched. These files are outside previously verified coverage and all known attempts.",
+    "This is a sample, not the full 3,683-file frontend suite.",
+    "The seven fork-only failing files were reproduced; no runtime fixes were applied during this audit."
+  ],
+  "reproduction": {
+    "command": [
+      "node",
+      "bench/wistia-compatibility.mjs",
+      "--wistia",
+      "/path/to/wistia",
+      "--files",
+      "docs/wistia-wave2-compatibility.json",
+      "--output",
+      "/tmp/wistia-wave2-audit",
+      "--workers",
+      "3"
+    ],
+    "raw_reports": "/tmp/turbo-dom-wave2/"
+  },
+  "selection": {
+    "seed": "turbo-dom-new-coverage-2026-11-01",
+    "previous_report_files": 57,
+    "other_log_or_cache_files": 22,
+    "excluded_known_files": 79,
+    "eligible_files": 3596,
+    "max_source_bytes": 80000,
+    "selection": "Round-robin feature groups ranked by SHA256; 140 JSX/TSX and 60 non-JSX files. Excludes every filename identifiable in earlier reports, logs and Vitest cache. Vitest also matches one TSX companion of a selected TS file; that additional file is included explicitly in the audited manifest.",
+    "limitations": [
+      "Earlier interrupted full sweeps did not retain complete inventories, so files never mentioned in their logs cannot be proven untouched. These files are outside previously verified coverage and all known attempts."
+    ],
+    "feature_groups": 168,
+    "original_selected_files": 200,
+    "additional_cli_matches": [
+      "frontend/components/Footer/OnboardingFooter/components/AgentTrigger.vitest.tsx"
+    ]
+  },
+  "files": [
+    "frontend/components/AccessibleColorPicker/color-conversion.vitest.ts",
+    "frontend/components/AudienceHeatmapsBanner/AudienceHeatmapsBanner.vitest.tsx",
+    "frontend/components/BackgroundColorPicker/BackgroundColorPicker.vitest.tsx",
+    "frontend/components/BackgroundColorPicker/backgroundColorOptions.vitest.ts",
+    "frontend/components/Banner/components/FreeTieredBanner.vitest.tsx",
+    "frontend/components/ChecklistIndicator/ChecklistIndicator.vitest.jsx",
+    "frontend/components/ColorPicker/ColorPicker.vitest.tsx",
+    "frontend/components/DomainWarningBanner/DomainWarningBanner.vitest.tsx",
+    "frontend/components/DurationInput/DurationInput.vitest.tsx",
+    "frontend/components/DynamicThumbnail/DynamicThumbnail.vitest.jsx",
+    "frontend/components/EnterprisePlanForm/EnterprisePlanForm.vitest.ts",
+    "frontend/components/Footer/FooterLaunchers.vitest.tsx",
+    "frontend/components/Footer/OnboardingFooter/components/AgentTrigger.vitest.ts",
+    "frontend/components/Footer/OnboardingFooter/components/AgentTrigger.vitest.tsx",
+    "frontend/components/IntegrationReconnectModal/IntegrationReconnectModal.vitest.tsx",
+    "frontend/components/LeadGen/MapFormSelect/index.vitest.tsx",
+    "frontend/components/LogoPicker/BrandKitLogoPickerList.vitest.tsx",
+    "frontend/components/MediaMetadata/Metadata/MetadataCopiedFromRow.vitest.tsx",
+    "frontend/components/NotificationTray/DownloadTask.vitest.tsx",
+    "frontend/components/RevampedSearch/SearchModalV2/ContentSearchShell.vitest.tsx",
+    "frontend/components/SegmentsBar/SegmentsBar.vitest.tsx",
+    "frontend/components/SelectedMedia/SelectedMedia.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/FolderVideoRequests.vitest.tsx",
+    "frontend/components/Slate/commands/components/LoadedCommandMenu.vitest.tsx",
+    "frontend/components/SpeakerBios/Speaker.vitest.tsx",
+    "frontend/components/SpeakerBios/theming/StyleVariableFactories.vitest.ts",
+    "frontend/components/TabbedCollapsiblePanel/components/TabbedCollapsiblePanel.vitest.tsx",
+    "frontend/components/TrialUnlockedBanner/Banner.vitest.tsx",
+    "frontend/components/UpgradeToDisplayPill/UpgradeToDisplayPill.vitest.tsx",
+    "frontend/components/WistiaVideo.vitest.jsx",
+    "frontend/components/ab_tests/show/components/TitleAndDescription/TitleAndDescriptionEditor.vitest.jsx",
+    "frontend/components/ab_tests/show/state/abTest/index.vitest.ts",
+    "frontend/components/chooser/components/UploadingMedia.vitest.jsx",
+    "frontend/components/infoBox/InfoBox.vitest.jsx",
+    "frontend/components/social_media_stats/Application.vitest.jsx",
+    "frontend/components/stats/charts/engagement/y_axis.vitest.js",
+    "frontend/components/tagging/MediaTagUI.vitest.tsx",
+    "frontend/components/users/components/UserListView/UsersList/UsersList.vitest.jsx",
+    "frontend/components/users/sagas.vitest.ts",
+    "frontend/credits/SocialClipsCreditsModal.vitest.tsx",
+    "frontend/datadogRum/assetChunkFailureReporting.vitest.ts",
+    "frontend/editTreeEditor/utils/deleteNode.vitest.ts",
+    "frontend/external/hootsuite/components/MediaCard.vitest.tsx",
+    "frontend/externalLinks.vitest.ts",
+    "frontend/gladmin/accounts/SubscriptionsScreen/useNormalizeBandwidthOptionSelection.vitest.ts",
+    "frontend/gladmin/customMotionKits/RefinePanel.vitest.tsx",
+    "frontend/hooks/useDesktopAppPromotion.vitest.ts",
+    "frontend/hooks/useForceRefreshOnRouteChange.vitest.jsx",
+    "frontend/iframeTranscriptEditor/TranscriptEmbed.vitest.tsx",
+    "frontend/liveChatWidget/getLiveChatData.vitest.ts",
+    "frontend/mcpAppSandbox/sandboxProxy.vitest.ts",
+    "frontend/mcp_app/tools/debugMcpApp/DebugCard.vitest.tsx",
+    "frontend/mcp_app/tools/getBackgroundJobStatus/useBackgroundJobStatus.vitest.ts",
+    "frontend/motionKitRoleEmbed/MotionKitRoleEmbedApp.vitest.tsx",
+    "frontend/onboarding/components/FancyTooltip/FancyTooltip.vitest.tsx",
+    "frontend/pushButtonFactories/ContactSwitcher/ContactSwitcher.vitest.tsx",
+    "frontend/scripts/strip-asset-source-content.vitest.ts",
+    "frontend/singlePageApp/App/AnonymousApp/AnonymousAppRouter.vitest.jsx",
+    "frontend/singlePageApp/App/AppRoot.vitest.jsx",
+    "frontend/singlePageApp/App/HardRedirect.vitest.tsx",
+    "frontend/singlePageApp/App/routes.vitest.ts",
+    "frontend/singlePageApp/autoRefresh/AutoRefreshProvider.vitest.tsx",
+    "frontend/singlePageApp/autoRefresh/buildRereadDocument.vitest.ts",
+    "frontend/singlePageApp/autoRefresh/droppedConnection.vitest.ts",
+    "frontend/singlePageApp/autoRefresh/refreshMetrics.vitest.ts",
+    "frontend/singlePageApp/bottler/sampleEventBottlerClient.vitest.ts",
+    "frontend/singlePageApp/components/AddToChannelModal/AddOneToChannelModal.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveMediaConfirmationModal/ArchiveMediaConfirmationModal.vitest.tsx",
+    "frontend/singlePageApp/components/AskWistia/AskWistiaPanelRestoreFallback.vitest.tsx",
+    "frontend/singlePageApp/components/AuthGate/AuthGate.vitest.tsx",
+    "frontend/singlePageApp/components/BetaCard/BetaCard.vitest.tsx",
+    "frontend/singlePageApp/components/BulkActionBar/allMedia/ArchiveButton.vitest.tsx",
+    "frontend/singlePageApp/components/BulkActionBar/project/AgentChatMediaContext.vitest.ts",
+    "frontend/singlePageApp/components/CallToAction/CallToAction.vitest.jsx",
+    "frontend/singlePageApp/components/ChannelThumbnail.vitest.tsx",
+    "frontend/singlePageApp/components/ContainerPicker/ContainerPicker.vitest.jsx",
+    "frontend/singlePageApp/components/ContentNotificationsModal/ContentNotificationsModal.vitest.tsx",
+    "frontend/singlePageApp/components/ContentPicker/MediaGroupList/MediaGroup.vitest.jsx",
+    "frontend/singlePageApp/components/ContentPicker/utilities/contentPickerSelection.vitest.ts",
+    "frontend/singlePageApp/components/CreateSubfolderIconButton/CreateSubfolderIconButton.vitest.tsx",
+    "frontend/singlePageApp/components/CustomFonts/FontUploader/validateCustomFontFile.vitest.ts",
+    "frontend/singlePageApp/components/CustomVibes/AnimatedEllipsis.vitest.tsx",
+    "frontend/singlePageApp/components/DesktopInstallPromptModal/DesktopInstallPromptModal.vitest.tsx",
+    "frontend/singlePageApp/components/DiscoverMoreCustomizeOnboarding/DiscoverMoreCustomizeConfig.vitest.tsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/DropdownColorPicker.vitest.tsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/useColorOptions.vitest.ts",
+    "frontend/singlePageApp/components/EmailSelect/helpers.vitest.ts",
+    "frontend/singlePageApp/components/EnhancedDependenciesSummary/EnhancedDependenciesSummary.vitest.tsx",
+    "frontend/singlePageApp/components/Filters/redesign2025/FilterToolbar/Widgets/Select/useControlledFilterSearch.vitest.tsx",
+    "frontend/singlePageApp/components/Filters/savedViews/filterGroups/media/contract.vitest.ts",
+    "frontend/singlePageApp/components/GridViewMedia/GridViewMedia.vitest.jsx",
+    "frontend/singlePageApp/components/ImportFromZoomModal/useMeetingsData.vitest.tsx",
+    "frontend/singlePageApp/components/ImportViaUrlModal/ImportViaUrlModal.vitest.tsx",
+    "frontend/singlePageApp/components/InfoCard/InfoCard.vitest.tsx",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/IntegrationFieldMappingSelector.vitest.tsx",
+    "frontend/singlePageApp/components/MediaActionItems/StatsLinkMenuItem/StatsLinkMenuItem.vitest.tsx",
+    "frontend/singlePageApp/components/MediaMetadataModal/MediaMetadata.vitest.tsx",
+    "frontend/singlePageApp/components/MediaView/AssigneeAvatarStack.vitest.tsx",
+    "frontend/singlePageApp/components/NavItems/MoreActions/ActionItemWithModal/ActionMenuItem.vitest.tsx",
+    "frontend/singlePageApp/components/NotificationBanner/NotificationBanner.vitest.jsx",
+    "frontend/singlePageApp/components/Promote/StatusText.vitest.jsx",
+    "frontend/singlePageApp/components/RedirectUnless/RedirectUnlessAllowedParams.vitest.jsx",
+    "frontend/singlePageApp/components/Search/InstantSearchWrapper.vitest.tsx",
+    "frontend/singlePageApp/components/Search/assembleFilters.vitest.ts",
+    "frontend/singlePageApp/components/SearchUnsplashPhotos/SearchUnsplashPhotos.vitest.tsx",
+    "frontend/singlePageApp/components/ShareFolderLinkModal/ShareFolderLinkModal.vitest.tsx",
+    "frontend/singlePageApp/components/SidePanel/LegacyAnalyticsSidePanel/LegacyAnalyticsSidePanel.vitest.tsx",
+    "frontend/singlePageApp/components/Sorting/buildSortModel.vitest.ts",
+    "frontend/singlePageApp/components/Sorting/useRememberedSortParam.vitest.tsx",
+    "frontend/singlePageApp/components/Studio/features/Backstage/hooks/useWhisperState.vitest.ts",
+    "frontend/singlePageApp/components/Studio/store/preview/previewStore.vitest.tsx",
+    "frontend/singlePageApp/components/TabBar/TabBar.vitest.tsx",
+    "frontend/singlePageApp/components/TagsMultiSelect/DropDown.vitest.tsx",
+    "frontend/singlePageApp/components/TrackingScripts/ManageTrackingScriptsPanel.vitest.tsx",
+    "frontend/singlePageApp/components/UsageTile/UsageTile.vitest.jsx",
+    "frontend/singlePageApp/components/bulkActions/ToggleAllCheckbox.vitest.jsx",
+    "frontend/singlePageApp/components/uploader/StreamUpload.vitest.ts",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileGridView.vitest.tsx",
+    "frontend/singlePageApp/components/viewSelection/ViewSelector.vitest.tsx",
+    "frontend/singlePageApp/contexts/CrossRouteUnsavedChanges.vitest.jsx",
+    "frontend/singlePageApp/hooks/brandkit/utilities.vitest.ts",
+    "frontend/singlePageApp/hooks/channels/useUploadToChannel.vitest.tsx",
+    "frontend/singlePageApp/hooks/liveGroupRecordHooks/adaptiveBackgroundPreset/useBackgroundPresetPreflight.vitest.tsx",
+    "frontend/singlePageApp/hooks/studio/useCanUseStudio.vitest.tsx",
+    "frontend/singlePageApp/hooks/useArchivedMediaLimits.vitest.jsx",
+    "frontend/singlePageApp/hooks/useBulkRestore.vitest.jsx",
+    "frontend/singlePageApp/hooks/useCharCounter.vitest.tsx",
+    "frontend/singlePageApp/hooks/useIsMounted.vitest.tsx",
+    "frontend/singlePageApp/hooks/useLoadFeatureFlags.vitest.tsx",
+    "frontend/singlePageApp/hooks/useModalManager.vitest.tsx",
+    "frontend/singlePageApp/hooks/useMotionKitCompletionNotifications.vitest.ts",
+    "frontend/singlePageApp/hooks/useScheduledTaskRunNotifications.vitest.tsx",
+    "frontend/singlePageApp/hooks/useTrackPageLoadSuccess.vitest.tsx",
+    "frontend/singlePageApp/layouts/SidePanelLayout/SidePanelLayout.vitest.tsx",
+    "frontend/singlePageApp/providers/DebugModeProvider.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountAudience/audienceFormat.vitest.ts",
+    "frontend/singlePageApp/screens/AccountAudience/components/DailyBars.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountStats/NoMedia.vitest.jsx",
+    "frontend/singlePageApp/screens/Activation/ActivationScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/AnonymousProject/ExportAllMediaButton.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelCustomizeRedesign/sections/Header/ChannelTitleAndDescription.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelCustomizeRedesign/testHelpers/mockControlsStoreMethods.vitest.ts",
+    "frontend/singlePageApp/screens/ChannelManage/ChannelSetupWizardModal/contexts/DesignContext/useSavedChannelDesign.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelStats/ChannelStats.vitest.jsx",
+    "frontend/singlePageApp/screens/ChannelStats/util.vitest.ts",
+    "frontend/singlePageApp/screens/ContactRequest/ContactRequestScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/getLibraryOwnerIndicatorType.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/components/Folder/DuplicateFolderMenuItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/application/useServices.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/captions.vitest.ts",
+    "frontend/singlePageApp/screens/EmailVerificationPromptScreen/EmailVerificationPromptScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/Favorites/__tests__/FavoritesScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/FolderAnalytics/FolderAnalyticsScreenContainer.vitest.tsx",
+    "frontend/singlePageApp/screens/FolderV2/Header/FolderPageBreadcrumbs.vitest.tsx",
+    "frontend/singlePageApp/screens/GroupRecordRecoveryScreen/tests/UploadStateDisplay.vitest.tsx",
+    "frontend/singlePageApp/screens/GroupRecordRecoveryScreen/utils/tests/downloadRecording.vitest.ts",
+    "frontend/singlePageApp/screens/Home/LatestActivity/timeline.vitest.ts",
+    "frontend/singlePageApp/screens/Home/_shared/HomeTopVideos.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/Audience/SeriesAudienceTable.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/Audience/useSeriesAudienceTableColumns.vitest.ts",
+    "frontend/singlePageApp/screens/Localization/LocalizationInventoryResults.vitest.tsx",
+    "frontend/singlePageApp/screens/Media/Comments/utils.vitest.ts",
+    "frontend/singlePageApp/screens/Media/Share/ShareModal/Publish/hooks/useNativePublishForm.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPlayerAndPageCustomizeScreen/ui/SaveAndDiscard/SaveScopeMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Menu/Share/ShareMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/SocialClips/hooks/useShouldRenderSocialClips.vitest.ts",
+    "frontend/singlePageApp/screens/MoreFeaturesInNav/useNewNavPodcasts.vitest.tsx",
+    "frontend/singlePageApp/screens/PodcastImport/PodcastImport.vitest.tsx",
+    "frontend/singlePageApp/screens/Podcasts/PodcastLaunchpadPanel.vitest.tsx",
+    "frontend/singlePageApp/screens/Project/Subfolder/SubfolderSearchRow.vitest.tsx",
+    "frontend/singlePageApp/screens/Project/cacheHelpers.vitest.js",
+    "frontend/singlePageApp/screens/PromoteChannelScreen/Promote.vitest.jsx",
+    "frontend/singlePageApp/screens/Purchase/PriceSummarySidebar.vitest.tsx",
+    "frontend/singlePageApp/screens/Purchase/utils/purchaseValidation.vitest.ts",
+    "frontend/singlePageApp/screens/QuickRecord/useLiveTranscript.vitest.tsx",
+    "frontend/singlePageApp/screens/RecentlyDeleted/RecentlyDeletedScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/RecentlyDeleted/utils.vitest.ts",
+    "frontend/singlePageApp/screens/RecordStage/Shared/GoBackButton.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/hooks/usePlayVideoTrack.vitest.ts",
+    "frontend/singlePageApp/screens/RemixViewer/RemixViewer.vitest.tsx",
+    "frontend/singlePageApp/screens/ReviewBundle/DownloadAllButton.vitest.tsx",
+    "frontend/singlePageApp/screens/Search/FullSearch/FullSearchPage.vitest.tsx",
+    "frontend/singlePageApp/screens/ShareLink/ShareLinkScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/SubfolderV2/Header/SubfolderMoreActionsMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/benchmarks/benchmarkHelpers.vitest.ts",
+    "frontend/singlePageApp/screens/analytics/conversion/MediaConversionAnalytics.vitest.tsx",
+    "frontend/singlePageApp/screens/shared/agentChat/AgentActivityProgress.vitest.tsx",
+    "frontend/singlePageApp/utilities/backgroundJobUtils.vitest.ts",
+    "frontend/singlePageApp/utilities/contentPickerSelectionIds.vitest.ts",
+    "frontend/singlePageApp/utilities/discountRemovalWarning.vitest.ts",
+    "frontend/singlePageApp/utilities/dragAndDropHelpers.vitest.ts",
+    "frontend/singlePageApp/utilities/getFutureDate.vitest.ts",
+    "frontend/singlePageApp/utilities/humanDuration.vitest.ts",
+    "frontend/singlePageApp/utilities/isMobileBrowser.vitest.ts",
+    "frontend/singlePageApp/utilities/useDeepCompare/useDeepCompareMemoize.vitest.ts",
+    "frontend/singlePageApp/utils/feedbackPreferences.vitest.ts",
+    "frontend/vite/plugins/noMockImports.vitest.ts",
+    "frontend/vitest/drainReactScheduler.vitest.tsx",
+    "frontend/vitest/preventBetaPackages.vitest.mts",
+    "frontend/webComponents/react-component.vitest.jsx"
+  ],
+  "excluded_files": [
+    "frontend/components/2025redesign/screenLayouts/GlobalActions/SideNav/SideNavButton.vitest.tsx",
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/components/Waveform/WaveformCanvas.vitest.tsx",
+    "frontend/components/chooser-v2/components/__tests__/ChooserChrome.vitest.tsx",
+    "frontend/jquery/jquery-legacy-compat.vitest.js",
+    "frontend/jquery/jquery-ready-timing.vitest.js",
+    "frontend/pricing/components/CreditTopUpCheckout/CreditTopUpCheckout.vitest.tsx",
+    "frontend/pricing/components/MapConnectionBanner/MapConnectionBannerView.vitest.tsx",
+    "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/pricing/planName.vitest.ts",
+    "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveAndRestore/RestoreMediaButton.vitest.jsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/colorOptionUtils.vitest.ts",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/InviteCollaboratorsModal/InviteCollaboratorsModal.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/AccountSettingsScreen/AccountSettingsScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/CancelScreen/CancelPage.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/IntegrationVendor/__tests__/IntegrationVendor.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/MotionKitSettings/motionKitListCache.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixVersionCard.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/TrimHandle.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useRemixEditHistory.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/widgets/FormWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/widgets/RemixWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/AnonymousMedia/AnonymousMediaScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/ChannelSetupWizardModal/AddContentStep/AddContentStep.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/channelCreationNavState.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+    "frontend/singlePageApp/screens/CreateSocialClips/services/useGetFoldersService/useGetFoldersService.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/application/useSelectionAttributes.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/domain/lanes/track.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/GroupRecord/hooks/tests/useUploadRetryService.vitest.ts",
+    "frontend/singlePageApp/screens/GroupRecord/sw/tests/group-record-upload-sw.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/AudienceRouter/RouterPage.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/mediaSession/roomLifecycleMachine.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/vendors/livekit/hooks/useLiveKitDevices.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/vendors/livekit/hooks/useLivekitRoom.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Registration/hooks/selectors.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaCustomize/Customize/AudioDescriptions/OrderAudioDescriptionModal.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaCustomize/Store/FormStore.vitest.ts",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/Podcasts/PodcastsScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/Purchase/index.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/JoinYourOrgScreen/JoinYourOrgScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/common/WtwSurface.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/audience/MediaAudienceAnalytics.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/components/dataTable/cells/EmbedLocationCell.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts",
+    "frontend/vitest/noNetwork.vitest.mts",
+    "frontend/vitest/turboForkFocusProbe.vitest.tsx",
+    "frontend/wistia-remotion/useTypedInputPropsForRoot.vitest.tsx"
+  ]
+}

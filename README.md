@@ -129,6 +129,11 @@ after the browser API fixes, including all six previously failing files. This
 does not cover the complete Wistia suite. See the [validation results](docs/wistia-six-file-validation.json)
 for the file selection, regression tests, and remaining runtime limitations.
 
+A second sample of 201 additional files found seven fork-only failing files
+(58 tests), plus one file that also fails under jsdom. See the
+[expanded compatibility audit](docs/wistia-wave2-compatibility.json) for the
+reproduced failures and browser API probes.
+
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
 | html5lib-tests conformance | **99.72%** | 37.35% | 97.03% |
