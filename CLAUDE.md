@@ -108,6 +108,13 @@ package or publish workflow.
   Wrappers are built lazily on access (live over the attribute, no snapshot). `newElement()`
   picks the subclass by ns at every construction site (inflate/innerHTML/cloneNode/createElementNS)
   — ordinary HTML elements stay plain `Element` (no SVG getters).
+- **Autonomous custom elements** live in `custom-elements.mjs`. The document-bound
+  registry and `HTMLElement` bridge are lazy. Ordinary documents never allocate
+  reaction queues; enabled documents allocate a queue only when reactions exist.
+  Construction/upgrade preserves wrapper identity and uses captured DOM intrinsics.
+  Mutations batch reactions, clone/import/adopt preserve tree order, and reset/teardown
+  discard old registries. Customized built-ins, form-associated elements/ElementInternals,
+  scoped registries and the moveBefore/connectedMove APIs remain unsupported.
 - **Canvas and media have scoped HTML subclasses** (`dom.mjs` `CanvasElement`/`MediaElement`),
   selected by `newElement()` for every creation path. Canvas width/height reflect numeric
   attributes with 300×150 defaults. Audio/video controls are virtual: `play()` resolves a
@@ -238,7 +245,8 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
 Numbers in README.md — refresh both (bench against jsdom AND happy-dom) if you touch hot paths.
 The Wistia fork's Linux ARM64 query smoke snapshot is 818,714 iters/sec versus jsdom
 29.1.1 at 1,164 and happy-dom 20.14.5 at 248,143 (Node 24.19.0, single run).
-See `docs/wistia-wave3-fixes-validation.json` for current observations and scope.
+See `docs/wistia-wave3-fixes-validation.json` for observations and scope. This snapshot
+precedes custom-element support, which was validated with custom-element tests only.
 - **Parse memoization (index.mjs `parseBufferCached`).** The SoA buffer is READ-ONLY — every
   mutation goes to a Document's own `__kids`/`__attrs`/`__cache` overlay, never the buffer — so
   the same buffer backs many Documents. Suites call setup with the same shell HTML per file →

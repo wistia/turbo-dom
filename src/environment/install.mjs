@@ -60,6 +60,7 @@ export function installGlobals(target, { html = DEFAULT_HTML, url } = {}) {
   define('__turboDom', { configurable: true, writable: true, value: env });
 
   const teardown = () => {
+    env.disposeCustomElements();
     for (const name of installed) {
       delete target[name];
       const prior = originals.get(name);

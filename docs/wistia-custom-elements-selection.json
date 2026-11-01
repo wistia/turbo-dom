@@ -1,0 +1,11 @@
+{
+  "scope": "Only Wistia test files directly registering/rendering custom elements or mocking customElements readiness. No broad sample or runtime comparison.",
+  "files": [
+    "frontend/webComponents/react-component.vitest.jsx",
+    "frontend/singlePageApp/components/TagManager/mountTagManager.vitest.ts",
+    "frontend/singlePageApp/screens/PlaylistCustomizeRedesign/components/PlaylistEmbed.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useOverlayWistiaPlayer.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Video/SharedMediaAuroraEmbed.vitest.tsx",
+    "frontend/singlePageApp/screens/AnonymousMedia/layouts/BaseLayout.vitest.tsx"
+  ]
+}

@@ -2485,7 +2485,7 @@ test('matchMedia removeEventListener no-op + customElements getName miss', async
   assert.equal(mq.addListener(() => {}), undefined);
   const ce = stubs.makeCustomElements();
   assert.equal(ce.getName(function Foo() {}), null); // not defined → null
-  assert.equal(ce.upgrade(), undefined);
+  assert.throws(() => ce.upgrade(), TypeError);
 });
 
 test('Storage.key out of range returns null; canvas createPattern stub', async () => {

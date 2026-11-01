@@ -67,6 +67,10 @@ function cachedQS(node, sel) {
   return r;
 }
 import { Buffer } from './buffer.mjs';
+import {
+  customElementsInserted, customElementsRemoved, customElementAttribute, customElementAdopted,
+  customElementClone, beginCustomElementCloning, endCustomElementCloning, installCustomElementReactions,
+} from './custom-elements.mjs';
 import { makeCanvasStub } from './stubs.mjs';
 
 export const ELEMENT_NODE = 1;
@@ -79,7 +83,7 @@ export const DOCUMENT_FRAGMENT_NODE = 11;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
-const nsUri = (short) => (short === 'svg' ? SVG_NS : short === 'math' ? MATHML_NS : HTML_NS);
+const nsUri = (short) => (short === 'svg' ? SVG_NS : short === 'math' ? MATHML_NS : short === '' ? HTML_NS : short);
 
 // ------------------------------------------------------------------ Node ----
 export class Node extends EventTarget {
@@ -163,6 +167,7 @@ export class Node extends EventTarget {
     if (node.ownerDocument !== this.ownerDocument) adoptInto(node, this.ownerDocument);
     notifyMutation(this, 'childList', node, null, ref || null);
     updateSelectAfterMutation(this);
+    if (this.ownerDocument?.__ceActive) customElementsInserted(node);
     return node;
   }
 
@@ -172,6 +177,7 @@ export class Node extends EventTarget {
     if (i === -1) throw new Error('NotFoundError: node is not a child');
     const next = kids[i + 1] || null;
     clearRemovedFocus(node);
+    if (this.ownerDocument?.__ceActive && node.isConnected) customElementsRemoved(node);
     this.ownerDocument?.__discardFrames?.(node);
     kids.splice(i, 1);
     node.parentNode = null;
@@ -304,6 +310,7 @@ export class Node extends EventTarget {
     clearRemovedFocus(this, true);
     const kids = this.__kids;
     if (kids) for (let i = 0; i < kids.length; i++) {
+      if (this.ownerDocument?.__ceActive && kids[i].isConnected) customElementsRemoved(kids[i]);
       this.ownerDocument?.__discardFrames?.(kids[i]);
       kids[i].parentNode = null;
     }
@@ -423,7 +430,7 @@ export class Element extends Node {
     this.__ns = namespace;            // '', 'svg', 'math'
     this.__attrs = undefined;         // lazily built (buffer or []) on first attr touch
     this.__attrIdx = -1;              // buffer index for lazy attr inflation
-    this.__content = localName === 'template' && !namespace ? undefined : null;
+    this.__content = localName === 'template' && namespace === '' ? undefined : null;
     this.shadowRoot = null;           // open shadow root, if attached
     // Predeclare the hot lazy fields (left at their "absent" sentinel) so every
     // Element shares ONE hidden class. Without this, fields added on demand in
@@ -445,7 +452,7 @@ export class Element extends Node {
   set content(value) { this.__content = value; }
 
   get nodeType() { return ELEMENT_NODE; }
-  get tagName() { return this.__ns ? this.localName : this.localName.toUpperCase(); }
+  get tagName() { return this.__ns === '' ? this.localName.toUpperCase() : this.localName; }
   get nodeName() { return this.tagName; }
   get namespaceURI() { return nsUri(this.__ns); }
 
@@ -455,14 +462,14 @@ export class Element extends Node {
   // elements are inflated for traversal but never have attrs read).
   __buildAttrs() { const doc = this.ownerDocument, buf = doc && doc.__buf; return (this.__attrIdx >= 0 && buf) ? buf.attrs(this.__attrIdx) : []; }
   getAttribute(name) {
-    if (!this.__ns) name = ('' + name).toLowerCase(); // HTML attr names are ASCII-lowercased (SVG/MathML keep case)
+    if (this.__ns === '') name = ('' + name).toLowerCase(); // HTML attr names are ASCII-lowercased (SVG/MathML keep case)
     const at = this.__attrs;
     if (at !== undefined) { for (let i = 0; i < at.length; i++) if (at[i].name === name) return at[i].value; return null; }
     const doc = this.ownerDocument, buf = doc && doc.__buf;        // lazy: read column, don't materialize
     return (this.__attrIdx >= 0 && buf) ? buf.attrGet(this.__attrIdx, name) : null;
   }
   hasAttribute(name) {
-    if (!this.__ns) name = ('' + name).toLowerCase();
+    if (this.__ns === '') name = ('' + name).toLowerCase();
     const at = this.__attrs;
     if (at !== undefined) { for (let i = 0; i < at.length; i++) if (at[i].name === name) return true; return false; }
     const doc = this.ownerDocument, buf = doc && doc.__buf;
@@ -475,18 +482,20 @@ export class Element extends Node {
   }
   getAttributeNames() { return (this.__attrs ?? (this.__attrs = this.__buildAttrs())).map((a) => a.name); }
   setAttribute(name, value) {
-    if (!this.__ns) name = ('' + name).toLowerCase();
+    if (this.__ns === '') name = ('' + name).toLowerCase();
+    const next = String(value);
     if (this.__attrs === undefined) this.__attrs = this.__buildAttrs();
     const a = this.__attrs.find((x) => x.name === name);
     const old = a ? a.value : null;
-    if (a) a.value = String(value);
-    else this.__attrs.push({ name, value: String(value), prefix: '' });
+    if (a) a.value = next;
+    else this.__attrs.push({ name, value: next, prefix: '' });
     if (this.localName === 'iframe' && name === 'srcdoc') this.ownerDocument.__discardFrames?.(this);
     updateSelectAfterAttribute(this, name);
     notifyMutation(this, 'attributes', null, null, null, name, old);
+    if (this.ownerDocument?.__ceActive) customElementAttribute(this, name, old, next);
   }
   removeAttribute(name) {
-    if (!this.__ns) name = ('' + name).toLowerCase();
+    if (this.__ns === '') name = ('' + name).toLowerCase();
     if (this.__attrs === undefined) this.__attrs = this.__buildAttrs();
     const a = this.__attrs.find((x) => x.name === name);
     this.__attrs = this.__attrs.filter((x) => x.name !== name);
@@ -494,6 +503,7 @@ export class Element extends Node {
       if (this.localName === 'iframe' && name === 'srcdoc') this.ownerDocument.__discardFrames?.(this);
       updateSelectAfterAttribute(this, name);
       notifyMutation(this, 'attributes', null, null, null, name, a.value);
+      if (this.ownerDocument?.__ceActive) customElementAttribute(this, name, a.value, null);
     }
   }
   toggleAttribute(name, force) {
@@ -814,13 +824,14 @@ export class Element extends Node {
       target.__kids.push(child);
     }
     updateSelectAfterMutation(target);
+    if (this.ownerDocument?.__ceActive) for (const child of target.__kids) customElementsInserted(child, true);
   }
   get outerHTML() { return serializeOuter(this); }
   get innerText() { return this.textContent; }
   set innerText(v) { this.textContent = v; }
 
   insertAdjacentHTML(position, html) {
-    const tmp = this.ownerDocument.createElement(this.localName);
+    const tmp = newElement(this.ownerDocument, this.localName, this.__ns);
     tmp.innerHTML = html;
     const nodes = tmp.__children().slice();
     const p = this.parentNode;
@@ -837,6 +848,7 @@ export class Element extends Node {
     const el = newElement(this.ownerDocument, this.localName, this.__ns);
     el.__attrs = (this.__attrs ?? (this.__attrs = this.__buildAttrs())).map((a) => ({ ...a }));
     if (this.localName === 'option') { el.__selected = this.__selected; el.__selectedDirty = this.__selectedDirty; }
+    if (this.ownerDocument?.__ceActive) customElementClone(el);
     if (deep) {
       if (this.content) el.content = this.content.cloneNode(true);
       // build the cloned child array directly — the clone is detached, so per-child
@@ -1197,8 +1209,8 @@ for (const attr of SVG_LENGTH_ATTRS) {
 // every construction site (buffer inflation, innerHTML, cloneNode, createElementNS) agrees.
 function newElement(doc, tag, ns) {
   if (ns === 'svg') return new SVGElement(doc, tag, ns);
-  if (!ns && tag === 'canvas') return new CanvasElement(doc, tag, ns);
-  if (!ns && (tag === 'audio' || tag === 'video')) return new MediaElement(doc, tag, ns);
+  if (ns === '' && tag === 'canvas') return new CanvasElement(doc, tag, ns);
+  if (ns === '' && (tag === 'audio' || tag === 'video')) return new MediaElement(doc, tag, ns);
   return new Element(doc, tag, ns);
 }
 
@@ -1250,6 +1262,7 @@ export class ShadowRoot extends DocumentFragment {
       child.parentNode = this;
       this.__kids.push(child);
     }
+    if (this.ownerDocument?.__ceActive) for (const child of this.__kids) customElementsInserted(child, true);
   }
   getElementById(id) {
     let found = null;
@@ -1746,7 +1759,10 @@ function adoptInto(node, doc, discardFrames = true) {
   if (discardFrames) node.ownerDocument?.__discardFrames?.(node);
   const kids = node.__children ? node.__children() : []; // inflate off the OLD buffer
   node.__idx = -1;
+  const previousDocument = node.ownerDocument;
   node.ownerDocument = doc;
+  if (previousDocument?.__ceActive) customElementAdopted(node, previousDocument, doc);
+  if (node.__shadow) adoptInto(node.__shadow, doc, false);
   for (const c of kids) adoptInto(c, doc, false);
   if (node.__content) adoptInto(node.__content, doc.__templateContentsOwner(), false);
 }
@@ -1965,11 +1981,16 @@ export class Document extends Node {
   }
 
   // ---- factories (owned nodes, no buffer) ----
-  createElement(tag) { return newElement(this, String(tag).toLowerCase(), ''); }
+  createElement(tag) {
+    const element = newElement(this, String(tag).toLowerCase(), '');
+    return this.__ceActive ? this.__ceContext?.create(element) || element : element;
+  }
   createElementNS(ns, qualified) {
-    const short = ns === SVG_NS ? 'svg' : ns === MATHML_NS ? 'math' : '';
+    ns = ns == null || ns === '' ? null : String(ns);
+    const short = ns === SVG_NS ? 'svg' : ns === MATHML_NS ? 'math' : ns === HTML_NS ? '' : ns;
     const local = qualified.includes(':') ? qualified.split(':')[1] : qualified;
-    return newElement(this, local, short);
+    const element = newElement(this, local, short);
+    return this.__ceActive ? this.__ceContext?.create(element) || element : element;
   }
   createTextNode(data) { return new Text(this, String(data)); }
   createComment(data) { return new Comment(this, String(data)); }
@@ -1987,7 +2008,14 @@ export class Document extends Node {
   createRange() { return new Range(this); }
   createAttribute(name) { return { name, value: '', ownerElement: null }; }
   getSelection() { if (!this.__selection) this.__selection = makeSelection(this); return this.__selection; }
-  importNode(node, deep) { const clone = node.cloneNode(deep); adoptInto(clone, this); return clone; }
+  importNode(node, deep) {
+    let clone;
+    beginCustomElementCloning();
+    try { clone = node.cloneNode(deep); } finally { endCustomElementCloning(); }
+    adoptInto(clone, this);
+    if (this.__ceActive) this.__ceContext?.registry.upgrade(clone);
+    return clone;
+  }
   adoptNode(node) { if (node.parentNode) node.parentNode.removeChild(node); adoptInto(node, this); return node; }
 
   // TreeWalker / NodeIterator (whatToShow: 1 elements, 4 text, 0xFFFFFFFF all)
@@ -2125,3 +2153,8 @@ export function parseDocument(html) {
   doc.__load(soa);
   return doc;
 }
+
+installCustomElementReactions(Node.prototype, ['insertBefore', 'removeChild', 'replaceChild'], ['textContent'], ['append', 'prepend', 'before', 'after', 'replaceWith', 'replaceChildren']);
+installCustomElementReactions(Element.prototype, ['setAttribute', 'removeAttribute', 'cloneNode', 'insertAdjacentHTML', 'insertAdjacentElement', 'insertAdjacentText'], ['innerHTML'], ['append', 'prepend', 'before', 'after', 'replaceWith', 'replaceChildren']);
+installCustomElementReactions(ShadowRoot.prototype, [], ['innerHTML']);
+installCustomElementReactions(Document.prototype, ['adoptNode', 'importNode']);

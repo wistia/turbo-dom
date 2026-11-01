@@ -1,3 +1,4 @@
+import { isCustomElementDefined } from './custom-elements.mjs';
 // Compact CSS selector engine. Correctness-first, right-to-left matching.
 // Supports: type, *, #id, .class, [attr], [attr op val] (= ^= $= *= ~= |=),
 // combinators (descendant ' ', child '>', adjacent '+', sibling '~'),
@@ -348,6 +349,8 @@ function matchPseudo(el, p) {
       return el.parentNode == null || el.parentNode.nodeType === 9;
     // form-state pseudo-classes — read the live PROPERTY (what React sets),
     // not just the HTML attribute.
+    case 'defined':
+      return !!isCustomElementDefined(el);
     case 'checked':
       return el.localName === 'option' ? !!el.selected : !!el.checked;
     case 'disabled':

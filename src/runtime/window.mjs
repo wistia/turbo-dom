@@ -7,12 +7,13 @@
 import {
   Storage, makeMatchMedia,
   IntersectionObserver, ResizeObserver,
-  FileReader, makeCanvasStub, makeCustomElements,
+  FileReader, makeCanvasStub,
   makeLocation, makeHistory,
 } from './stubs.mjs';
 import { makeGetComputedStyle } from './cascade.mjs';
 import { CSSStyleSheet } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
+import { createCustomElementContext, CustomElementRegistry } from './custom-elements.mjs';
 import { MessageChannel, MessagePort, cloneMessage } from './messaging.mjs';
 import {
   Node, Element, CanvasElement, MediaElement, MEDIA_CONSTANTS, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
@@ -201,7 +202,6 @@ const hostClearTimeout = globalThis.clearTimeout;
 // self-replaces onto the per-env base, so each env gets its own instance; only
 // the factory objects/closures are shared, saving ~28 allocations per test file.
 const SHARED_LAZY = {
-  customElements: () => makeCustomElements(), // fresh registry per env, built on first access
   localStorage: () => new Storage(),
   sessionStorage: () => new Storage(),
   getComputedStyle: () => makeGetComputedStyle(),
@@ -248,6 +248,8 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   let messageErrorHandler = null;
   let generation = 0;
   let frames;
+  let customElements;
+  const customContext = () => customElements ||= createCustomElementContext(document, Element, isAncestorActive);
   const receiver = () => document.defaultView || windowProxy;
   let messageListener, messageErrorListener;
   const setHandler = (type, previous, next, listener) => {
@@ -272,8 +274,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     closed: false,
     // origin is lazy (per-env, captures url) — window.origin is rarely read, so the
     // eager `new URL(url)` parse per createWindow was usually wasted.
-    // customElements is lazy (SHARED_LAZY) — env-independent + rarely used; building
-    // its two Maps eagerly per createWindow was wasted for the typical test.
+    // HTMLElement and customElements share a lazy document-bound construction context.
     Image: function Image(w, h) { const img = document.createElement('img'); if (w != null) img.setAttribute('width', w); if (h != null) img.setAttribute('height', h); return img; },
     getSelection: () => document.getSelection(),
     dispatchEvent: (e) => {
@@ -324,6 +325,8 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    HTMLElement: () => customContext().HTMLElement,
+    customElements: () => customContext().registry,
     Audio: () => {
       function Audio(src) {
         const audio = document.createElement('audio');
@@ -429,7 +432,9 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     // every global name this window can provide (for environment adapters)
     globalKeys: [...Object.keys(base), ...Object.keys(STATIC_BASE), ...Object.keys(lazy), ...Object.keys(SHARED_LAZY)],
     // Layer 5: drop materialized global slots, keep the class machinery warm.
+    disposeCustomElements() { customElements?.dispose(); customElements = null; },
     resetGlobals() {
+      customElements?.dispose(); customElements = null;
       generation++;
       frames = undefined;
       document.__discardFrames = null;
@@ -573,7 +578,7 @@ const STATIC_BASE = {
   DataTransfer,
   // HTML interfaces inherit Element → `el instanceof HTMLElement` is true.
   // Tag-specific interfaces match by localName via Symbol.hasInstance.
-  HTMLElement: Element, SVGElement,
+  CustomElementRegistry, SVGElement,
   // SVG interface globals. Libs (and test setup mocks) do
   // `Object.defineProperty(SVGSVGElement.prototype, 'viewBox', …)` and
   // `el instanceof SVGSVGElement`; an undefined global is a hard ReferenceError.
