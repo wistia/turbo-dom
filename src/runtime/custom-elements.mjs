@@ -91,7 +91,7 @@ function upgradeElement(record, definition) {
   for (const name of definition.context.attributeNames.call(element)) {
     if (definition.observed.has(name)) callback(record, 'attributeChangedCallback', [name, null, definition.context.attribute.call(element, name), null]);
   }
-  if (element.isConnected) callback(record, 'connectedCallback');
+  if (isNodeConnected(element)) callback(record, 'connectedCallback');
   const entry = { element, used: false };
   definition.stack.push(entry);
   try {
@@ -234,12 +234,19 @@ export function makeCustomElements() { return createCustomElementContext(null, n
 export function isCustomElementDefined(element) {
   return element.__ns !== '' || !element.localName.includes('-') || RESERVED.has(element.localName) || records.get(element)?.state === 'custom';
 }
+export function isNodeConnected(node) {
+  for (;;) {
+    while (node.parentNode) node = node.parentNode;
+    if (node.__isShadowRoot) { node = node.host; continue; }
+    return node.nodeType === 9;
+  }
+}
 export function customElementsInserted(node, parsed = false) {
   const context = node.ownerDocument?.__ceContext;
   walk(node, element => {
     const record = records.get(element);
-    if (record?.state === 'custom') { if (element.isConnected) callback(record, 'connectedCallback'); }
-    else if (context && current(context) && (parsed || element.isConnected) && !element.ownerDocument.__isTemplateDocument) tryUpgrade(element, context);
+    if (record?.state === 'custom') { if (isNodeConnected(element)) callback(record, 'connectedCallback'); }
+    else if (context && current(context) && (parsed || isNodeConnected(element)) && !element.ownerDocument.__isTemplateDocument) tryUpgrade(element, context);
   });
 }
 export function customElementsRemoved(node) {
@@ -273,7 +280,10 @@ export function installCustomElementReactions(prototype, names, setters = [], va
   for (const name of variadic) {
     const original = prototype[name];
     prototype[name] = function() {
-      if (operationDepth || !this.ownerDocument?.__ceActive) return original.apply(this, arguments);
+      if (operationDepth) return original.apply(this, arguments);
+      let active = this.ownerDocument?.__ceActive;
+      for (let i = 0; !active && i < arguments.length; i++) active = arguments[i]?.ownerDocument?.__ceActive;
+      if (!active) return original.apply(this, arguments);
       operationDepth++; beginCustomElementReactions();
       try { return original.apply(this, arguments); } finally { operationDepth--; endCustomElementReactions(); }
     };

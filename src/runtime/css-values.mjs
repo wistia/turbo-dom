@@ -25,7 +25,7 @@ export function normalizeZeroLengths(property, value) {
 }
 
 export function resolveViewportLength(property, value, width, height) {
-  if (!LENGTH_PROPS.has(property)) return value;
+  if (property !== 'line-height' && !LENGTH_PROPS.has(property)) return value;
   const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(vw|vh|vmin|vmax)$/i.exec(value);
   if (!match) return value;
   let dimension;

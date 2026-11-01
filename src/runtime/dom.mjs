@@ -68,7 +68,7 @@ function cachedQS(node, sel) {
 }
 import { Buffer } from './buffer.mjs';
 import {
-  customElementsInserted, customElementsRemoved, customElementAttribute, customElementAdopted,
+  isNodeConnected, customElementsInserted, customElementsRemoved, customElementAttribute, customElementAdopted,
   customElementClone, beginCustomElementCloning, endCustomElementCloning, installCustomElementReactions,
 } from './custom-elements.mjs';
 import { makeCanvasStub } from './stubs.mjs';
@@ -177,7 +177,7 @@ export class Node extends EventTarget {
     if (i === -1) throw new Error('NotFoundError: node is not a child');
     const next = kids[i + 1] || null;
     clearRemovedFocus(node);
-    if (this.ownerDocument?.__ceActive && node.isConnected) customElementsRemoved(node);
+    if (this.ownerDocument?.__ceActive && isNodeConnected(node)) customElementsRemoved(node);
     this.ownerDocument?.__discardFrames?.(node);
     kids.splice(i, 1);
     node.parentNode = null;
@@ -201,13 +201,7 @@ export class Node extends EventTarget {
   }
 
   get isConnected() {
-    let n = this;
-    for (;;) {
-      while (n.parentNode) n = n.parentNode;
-      // a node inside a shadow tree is connected iff its host is connected
-      if (n.__isShadowRoot) { n = n.host; continue; }
-      return n.nodeType === DOCUMENT_NODE;
-    }
+    return isNodeConnected(this);
   }
   getRootNode(options) {
     let n = this;
@@ -310,7 +304,7 @@ export class Node extends EventTarget {
     clearRemovedFocus(this, true);
     const kids = this.__kids;
     if (kids) for (let i = 0; i < kids.length; i++) {
-      if (this.ownerDocument?.__ceActive && kids[i].isConnected) customElementsRemoved(kids[i]);
+      if (this.ownerDocument?.__ceActive && isNodeConnected(kids[i])) customElementsRemoved(kids[i]);
       this.ownerDocument?.__discardFrames?.(kids[i]);
       kids[i].parentNode = null;
     }
@@ -813,7 +807,7 @@ export class Element extends Node {
   get innerHTML() { return serializeInner(this); }
   set innerHTML(html) {
     const frag = getParser().parseFragment(String(html), this.__ns ? `${this.__ns} ${this.localName}` : this.localName);
-    const target = this.content || this;
+    const target = this.localName === 'template' && this.__ns === '' ? this.content : this;
     target.__detachKids();
     target.__kids = [];
     target.__touch();
@@ -850,7 +844,7 @@ export class Element extends Node {
     if (this.localName === 'option') { el.__selected = this.__selected; el.__selectedDirty = this.__selectedDirty; }
     if (this.ownerDocument?.__ceActive) customElementClone(el);
     if (deep) {
-      if (this.content) el.content = this.content.cloneNode(true);
+      if (this.localName === 'template' && this.__ns === '') el.content = this.content.cloneNode(true);
       // build the cloned child array directly — the clone is detached, so per-child
       // appendChild's notifyMutation (version bump) + reparent check are pure waste.
       const src = this.__children(), od = el.ownerDocument, kids = el.__kids = new Array(src.length);

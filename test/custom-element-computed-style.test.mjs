@@ -112,3 +112,19 @@ test('custom elements adopted into an inert document retain unresolved units wit
   assert.equal(inert.defaultView, null);
   assert.equal(window.getComputedStyle(element).width, '10vw');
 });
+
+test('viewport line-height resolves and inherits without changing unitless numbers', () => {
+  const { window, document, element } = fixture();
+  window.innerWidth = 1000;
+  element.style.lineHeight = '2vw';
+  const child = document.createElement('span');
+  element.appendChild(child);
+  assert.equal(window.getComputedStyle(element).lineHeight, '20px');
+  assert.equal(window.getComputedStyle(child).lineHeight, '20px');
+  assert.equal(element.style.lineHeight, '2vw');
+  for (const value of ['0', '1.5']) {
+    element.style.lineHeight = value;
+    assert.equal(window.getComputedStyle(element).lineHeight, value);
+    assert.equal(window.getComputedStyle(child).lineHeight, value);
+  }
+});

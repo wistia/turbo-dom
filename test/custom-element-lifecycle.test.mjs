@@ -350,3 +350,58 @@ test('observed attribute values are converted once and callbacks receive the sto
     return events;
   });
 });
+
+test('custom content accessors do not participate in template operations', () => {
+  oracle('', window => {
+    class ContentElement extends window.HTMLElement { get content() { return 'custom data'; } }
+    window.customElements.define('x-content', ContentElement);
+    const element = window.document.createElement('x-content');
+    element.innerHTML = '<span>child</span>';
+    const clone = element.cloneNode(true);
+    assert.ok(clone instanceof ContentElement);
+    assert.equal(clone.content, 'custom data');
+    return [element.innerHTML, clone.innerHTML, clone.firstChild !== element.firstChild];
+  });
+});
+
+test('connection callbacks ignore overridden isConnected during upgrade and removal', () => {
+  oracle('<x-connection></x-connection>', window => {
+    const events = [];
+    class ConnectionElement extends window.HTMLElement {
+      get isConnected() { return false; }
+      connectedCallback() { events.push('connected'); }
+      disconnectedCallback() { events.push('disconnected'); }
+    }
+    window.customElements.define('x-connection', ConnectionElement);
+    window.document.querySelector('x-connection').remove();
+    const element = window.document.createElement('x-connection');
+    window.document.body.append(element);
+    window.document.body.replaceChildren();
+    return events;
+  });
+});
+
+test('cross-document variadic insertions finish before custom-element reactions', () => {
+  for (const method of ['append', 'prepend', 'replaceChildren']) {
+    function scenario(source, destination) {
+      const events = [];
+      class MovingElement extends source.HTMLElement {
+        connectedCallback() { events.push(['connected', this.ownerDocument.body.childNodes.length]); }
+        disconnectedCallback() { events.push(['disconnected', this.ownerDocument.body.childNodes.length]); }
+        adoptedCallback() { events.push(['adopted', this.ownerDocument.body.childNodes.length]); }
+      }
+      source.customElements.define('x-moving', MovingElement);
+      const first = source.document.createElement('x-moving');
+      const second = source.document.createElement('x-moving');
+      source.document.body.append(first, second);
+      events.length = 0;
+      destination.document.body[method]('prefix', first, second);
+      return events;
+    }
+    const source = new JSDOM('');
+    const destination = new JSDOM('');
+    try {
+      assert.deepEqual(scenario(fresh().window, fresh().window), scenario(source.window, destination.window), method);
+    } finally { source.window.close(); destination.window.close(); }
+  }
+});
