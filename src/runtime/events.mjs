@@ -84,9 +84,9 @@ const MOUSE_DEFAULTS = {
 const TYPED_DEFAULTS = {
   UIEvent: UI_DEFAULTS,
   MouseEvent: MOUSE_DEFAULTS,
-  PointerEvent: { ...MOUSE_DEFAULTS, pointerId: 0, pointerType: '', width: 1, height: 1, pressure: 0, tangentialPressure: 0, tiltX: 0, tiltY: 0, twist: 0, isPrimary: false },
+  PointerEvent: { ...MOUSE_DEFAULTS, pointerId: 0, pointerType: '', width: 1, height: 1, pressure: 0, tangentialPressure: 0, tiltX: 0, tiltY: 0, twist: 0, altitudeAngle: Math.PI / 2, azimuthAngle: 0, isPrimary: false },
   KeyboardEvent: { ...UI_DEFAULTS, ...MODIFIER_DEFAULTS, key: '', code: '', keyCode: 0, charCode: 0, which: 0, location: 0, repeat: false, isComposing: false },
-  InputEvent: { ...UI_DEFAULTS, data: null, inputType: '', isComposing: false },
+  InputEvent: { ...UI_DEFAULTS, data: null, dataTransfer: null, inputType: '', isComposing: false },
   FocusEvent: { ...UI_DEFAULTS, relatedTarget: null },
   CompositionEvent: { ...UI_DEFAULTS, data: '' },
   WheelEvent: { ...MOUSE_DEFAULTS, deltaX: 0, deltaY: 0, deltaZ: 0, deltaMode: 0 },

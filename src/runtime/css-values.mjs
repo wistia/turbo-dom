@@ -24,7 +24,7 @@ export function normalizeZeroLengths(property, value) {
 
 export function splitDeclarations(text) {
   const declarations = [];
-  let start = 0, quote = '', depth = 0;
+  let start = 0, quote = '', depth = 0, prefix = '';
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch === '\\') { i++; continue; }
@@ -32,14 +32,26 @@ export function splitDeclarations(text) {
       if (ch === quote) quote = '';
       continue;
     }
+    if (ch === '/' && text[i + 1] === '*') {
+      prefix += text.slice(start, i);
+      const colon = prefix.indexOf(':');
+      const customValue = colon !== -1 && prefix.slice(0, colon).trim().startsWith('--');
+      const end = text.indexOf('*/', i + 2);
+      const commentEnd = end === -1 ? text.length : end + 2;
+      prefix += customValue ? text.slice(i, commentEnd) : ' ';
+      i = commentEnd - 1;
+      start = commentEnd;
+      continue;
+    }
     if (ch === '"' || ch === "'") quote = ch;
     else if (ch === '(' || ch === '[' || ch === '{') depth++;
     else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
     else if (ch === ';' && depth === 0) {
-      declarations.push(text.slice(start, i));
+      declarations.push(prefix + text.slice(start, i));
+      prefix = '';
       start = i + 1;
     }
   }
-  declarations.push(text.slice(start));
+  declarations.push(prefix + text.slice(start));
   return declarations;
 }

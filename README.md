@@ -138,6 +138,8 @@ one deferred custom-element lifecycle failure, and 18 skipped/todo tests. See th
 [follow-up validation](docs/wistia-wave2-fixes-validation.json) for coverage and limits.
 The [review-fix validation](docs/wistia-review-fixes-validation.json) records subsequent
 CSS/event/iframe edge-case fixes and a repeated-style-read microbenchmark.
+The [second review-fix record](docs/wistia-review2-fixes-validation.json) covers CSS
+comments, CSSOM cache normalization, and retained input/pointer event fields.
 
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|

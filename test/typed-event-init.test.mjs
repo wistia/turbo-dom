@@ -44,3 +44,25 @@ test('typed event dictionaries retain inherited UI, mouse and modifier members',
   assert.equal(keyboard.location, 3);
   assert.equal(keyboard.isComposing, true);
 });
+
+test('pointer event dictionaries retain pen orientation angles', () => {
+  const { window } = createEnvironment();
+  const pointer = new window.PointerEvent('pointerdown', { altitudeAngle: 0.2, azimuthAngle: 0.3 });
+  assert.equal(pointer.altitudeAngle, 0.2);
+  assert.equal(pointer.azimuthAngle, 0.3);
+  const defaults = new window.PointerEvent('pointerdown');
+  assert.equal(defaults.altitudeAngle, Math.PI / 2);
+  assert.equal(defaults.azimuthAngle, 0);
+});
+
+test('input event dictionaries retain paste and drop transfer data', () => {
+  const { window } = createEnvironment();
+  const transfer = new window.DataTransfer();
+  transfer.setData('text/plain', 'pasted text');
+  for (const inputType of ['insertFromPaste', 'insertFromDrop']) {
+    const event = new window.InputEvent('beforeinput', { inputType, dataTransfer: transfer });
+    assert.equal(event.dataTransfer, transfer);
+    assert.equal(event.dataTransfer.getData('text/plain'), 'pasted text');
+  }
+  assert.equal(new window.InputEvent('beforeinput').dataTransfer, null);
+});

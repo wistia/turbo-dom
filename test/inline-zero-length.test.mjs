@@ -156,3 +156,60 @@ test('computed inline and stylesheet declarations preserve quoted semicolons', (
   assert.equal(computed.content, '"c;d"');
   assert.equal(computed.left, '0px');
 });
+
+test('cached standard CSSOM writes normalize whitespace consistently with parsed attributes', () => {
+  const { actual, expected, turbo } = pair();
+  for (const [property, value] of [['display', ' block '], ['opacity', ' 0.5 '], ['left', ' 0 ']]) {
+    actual.style.setProperty(property, value, 'important');
+    expected.style.setProperty(property, value, 'important');
+    assert.equal(actual.style.getPropertyValue(property), expected.style.getPropertyValue(property));
+    assert.equal(actual.style.getPropertyPriority(property), 'important');
+    const copy = turbo.document.createElement('div');
+    copy.setAttribute('style', actual.getAttribute('style'));
+    assert.equal(copy.style.getPropertyValue(property), actual.style.getPropertyValue(property));
+    assert.equal(copy.style.getPropertyPriority(property), actual.style.getPropertyPriority(property));
+  }
+  actual.style.opacity = ' 0.75 ';
+  assert.equal(actual.style.opacity, '0.75');
+  assert.equal(actual.style.getPropertyPriority('opacity'), 'important');
+  actual.style.setProperty('--spaced', '  token  ');
+  assert.equal(actual.style.getPropertyValue('--spaced'), '  token  ');
+});
+
+test('CSS comments cannot change declaration string or delimiter state', () => {
+  const { actual, expected, turbo } = pair();
+  const text = `width: 1px; /* don't tokenize \"; ([{ */ height: 2px; opacity: 0.5; left: /* ]; ' */ 0; content: "/* literal; */"`;
+  for (const assign of [
+    element => { element.style.cssText = text; },
+    element => element.setAttribute('style', text),
+  ]) {
+    assign(actual);
+    assign(expected);
+    for (const property of ['width', 'height', 'opacity', 'left', 'content']) {
+      assert.equal(actual.style.getPropertyValue(property), expected.style.getPropertyValue(property), property);
+    }
+    turbo.document.body.appendChild(actual);
+    const computed = turbo.window.getComputedStyle(actual);
+    assert.equal(computed.height, '2px');
+    assert.equal(computed.opacity, '0.5');
+    assert.equal(computed.content, '"/* literal; */"');
+  }
+});
+
+test('unterminated CSS comments discard their contents without losing earlier declarations', () => {
+  const { actual, expected } = pair();
+  actual.style.cssText = expected.style.cssText = "width: 1px; opacity: 0.5; /* don't parse height: 2px";
+  assert.equal(actual.style.width, expected.style.width);
+  assert.equal(actual.style.opacity, expected.style.opacity);
+  assert.equal(actual.style.height, expected.style.height);
+});
+
+
+test('custom property comments and quoted comment text remain literal', () => {
+  const { actual, expected } = pair();
+  const text = `/* before name */ --tokens: a/* don't split ; ([ */b; --quoted: "/* literal; */"; opacity: 0.5`;
+  actual.style.cssText = expected.style.cssText = text;
+  for (const property of ['--tokens', '--quoted', 'opacity']) {
+    assert.equal(actual.style.getPropertyValue(property), expected.style.getPropertyValue(property), property);
+  }
+});

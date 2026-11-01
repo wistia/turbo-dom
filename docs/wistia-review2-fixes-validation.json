@@ -1,0 +1,85 @@
+{
+  "date": "2026-11-01",
+  "base_fork_commit": "daa389c",
+  "scope": "Resolve three further review findings in CSS comment parsing, cached CSSOM writes, and typed-event initialization. Custom-element lifecycle and previously documented DOM limitations remain excluded.",
+  "fixes": [
+    {
+      "finding": "Cached standard CSSOM writes bypass whitespace normalization",
+      "resolution": "Trim standard-property values before retaining them as cached parsed state. Preserve existing custom-property write whitespace and existing important priority flags.",
+      "regressions": [
+        "setProperty standard values match jsdom and reparsed attributes",
+        "Property assignments normalize whitespace without changing priority",
+        "Custom-property write whitespace remains intact"
+      ]
+    },
+    {
+      "finding": "Quotes and delimiters inside CSS comments swallow following declarations",
+      "resolution": "Skip comment contents during declaration tokenization, remove standard-property comments, and preserve comment tokens inside custom-property values. Quoted comment-looking strings remain literal. Inline CSSOM and computed-style declaration parsing share the scanner.",
+      "regressions": [
+        "Quotes, brackets and semicolons in comments cannot change scanner state",
+        "Inline computed values survive comments",
+        "Unterminated comments preserve earlier declarations",
+        "Custom-property comment tokens and quoted text remain literal"
+      ]
+    },
+    {
+      "finding": "Typed event allowlist drops valid pointer orientation and input transfer fields",
+      "resolution": "Retain altitudeAngle and azimuthAngle for pointer events and dataTransfer for input events, with defaults. Unknown-member filtering remains unchanged.",
+      "regressions": [
+        "Explicit pointer angles and defaults",
+        "Paste/drop DataTransfer identity and text contents",
+        "Existing unknown getter fields remain unread"
+      ]
+    }
+  ],
+  "validation": {
+    "targeted_tests_passed": 18,
+    "new_regression_tests": 6,
+    "unit_tests_passed": 643,
+    "unit_tests_skipped": 4,
+    "unit_tests_failed": 0,
+    "vitest_tests_passed": 29,
+    "jest_tests_passed": 2,
+    "coverage_percent": {
+      "lines": 99.24,
+      "branches": 95.42,
+      "functions": 98.24
+    }
+  },
+  "performance": {
+    "platform": "linux-arm64",
+    "node": "24.19.0",
+    "style_read_microbenchmark": {
+      "command": "node bench/style-read.mjs",
+      "before_commit": "daa389c",
+      "iterations_per_sample": 100000,
+      "samples": 5,
+      "warmup_reads": 10000,
+      "statistic": "Median milliseconds; lower is better. Fixed five-declaration element with repeated reads and no mutations.",
+      "before_median_ms": {
+        "cssText": 4.285363000000004,
+        "property": 28.005641999999995
+      },
+      "after_median_ms": {
+        "cssText": 8.925111999999999,
+        "property": 28.886404000000027
+      },
+      "limits": "Single invocation per condition, before heavy test jobs began. cssText was slower in this observation; no explanation or end-to-end suite performance claim is established by these measurements."
+    },
+    "query_smoke": {
+      "command": "npm run bench:query",
+      "iterations_per_second": {
+        "turbo_dom": 760626,
+        "jsdom_29_1_1": 1054,
+        "happy_dom_20_14_5": 243979
+      },
+      "limits": "Single run before native/integration jobs began. Query microbenchmark only; not an end-to-end suite speed claim."
+    }
+  },
+  "wistia_integration": "Root agent is running the unchanged 63-file compatibility selection; results will be appended after completion.",
+  "limits": [
+    "This remains a partial DOM implementation and does not expand custom-element lifecycle support.",
+    "CSS comment handling fixes declaration tokenization; it is not a complete CSS grammar validator.",
+    "Existing custom-property whitespace behavior is preserved rather than broadened to full browser CSSOM conformance."
+  ]
+}

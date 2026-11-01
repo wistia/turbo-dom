@@ -1528,6 +1528,9 @@ function makeStyle(el) {
   };
   const serialize = ({ values, prio }) => [...values].map(([k, v]) => `${k}: ${normalizeZeroLengths(k, v)}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; ');
   const write = (style) => {
+    for (const [property, value] of style.values) {
+      if (!property.startsWith('--')) style.values.set(property, value.trim());
+    }
     const text = serialize(style);
     el.setAttribute('style', text);
     cachedText = cachedSerialization = text;
