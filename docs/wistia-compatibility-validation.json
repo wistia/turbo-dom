@@ -1,0 +1,214 @@
+{
+  "date": "2026-11-01",
+  "fork_base_commit": "a49793a0131e58d19d5deb78b9c9185574577581",
+  "runtime_base_version": "0.5.8",
+  "wistia_commit": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+  "node": "24.19.0",
+  "platform": "Linux ARM64",
+  "scope": "JavaScript runtime fixes for Option, history URL synchronization, installed fetch/base64 delegates, and focus cleanup when nodes are removed.",
+  "regression_tests_added": 14,
+  "fork_checks": {
+    "node_tests": {
+      "passed": 558,
+      "skipped": 4,
+      "failed": 0,
+      "skips": "WASM parser builds are absent"
+    },
+    "coverage_percent": {
+      "lines": 99.17,
+      "functions": 98.12,
+      "branches": 95.17
+    },
+    "vitest": {
+      "passed": 29,
+      "failed": 0
+    },
+    "jest": {
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "wistia_targeted_before_on_unmodified_0_5_8": {
+    "files": 6,
+    "failed_files": 6,
+    "passed_tests": 45,
+    "failed_tests": 12,
+    "collected_tests": 57
+  },
+  "wistia_targeted_after": {
+    "files": 7,
+    "passed_files": 7,
+    "passed_tests": 68,
+    "failed_tests": 0,
+    "files_included": [
+      "frontend/vitest/noNetwork.vitest.mts",
+      "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+      "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+      "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+      "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+      "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+      "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx"
+    ]
+  },
+  "original_0_5_7_sample": {
+    "files": 56,
+    "passed_files": 41,
+    "passed_tests": 388,
+    "failed_tests": 27,
+    "uncollected_tests": 16
+  },
+  "fixed_fork_sample": {
+    "files": 56,
+    "passed_files": 50,
+    "passed_tests": 424,
+    "failed_tests": 7,
+    "collected_tests": 431,
+    "uncollected_tests": 0
+  },
+  "sample_files": [
+    "frontend/components/2025redesign/screenLayouts/GlobalActions/SideNav/SideNavButton.vitest.tsx",
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/components/Waveform/WaveformCanvas.vitest.tsx",
+    "frontend/components/chooser-v2/components/__tests__/ChooserChrome.vitest.tsx",
+    "frontend/jquery/jquery-legacy-compat.vitest.js",
+    "frontend/jquery/jquery-ready-timing.vitest.js",
+    "frontend/pricing/components/MapConnectionBanner/MapConnectionBannerView.vitest.tsx",
+    "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveAndRestore/RestoreMediaButton.vitest.jsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/colorOptionUtils.vitest.ts",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/CancelScreen/CancelPage.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/MotionKitSettings/motionKitListCache.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/TrimHandle.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/channelCreationNavState.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+    "frontend/singlePageApp/screens/CreateSocialClips/services/useGetFoldersService/useGetFoldersService.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/application/useSelectionAttributes.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/domain/lanes/track.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Registration/hooks/selectors.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/JoinYourOrgScreen/JoinYourOrgScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/common/WtwSurface.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/components/dataTable/cells/EmbedLocationCell.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts",
+    "frontend/vitest/noNetwork.vitest.mts",
+    "frontend/wistia-remotion/useTypedInputPropsForRoot.vitest.tsx"
+  ],
+  "remaining_failures": [
+    {
+      "file": "frontend/jquery/jquery-legacy-compat.vitest.js",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "installLegacyCompat lets the _jquery_ui_core.js :data(name) selector take an argument",
+          "error": "AssertionError: expected [] to deeply equal [ <span></span> ]"
+        }
+      ]
+    },
+    {
+      "file": "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "UploadFileListViewImproved has a11y compliance",
+          "error": "TypeError: Right-hand side of 'instanceof' is not an object"
+        }
+      ]
+    },
+    {
+      "file": "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "EditableTextWidget renders pre-populated editable text",
+          "error": "Error: expect(element).toHaveValue(Paragraph one."
+        }
+      ]
+    },
+    {
+      "file": "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "useTrimTipAnchor resolves the end handle when both edges are in view, else the visible one, else null",
+          "error": "AssertionError: expected null to be 'start' // Object.is equality"
+        },
+        {
+          "name": "useTrimTipAnchor treats the anchor as in view until the track first scrolls, then follows the scroll window",
+          "error": "AssertionError: expected false to be true // Object.is equality"
+        }
+      ]
+    },
+    {
+      "file": "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "GeneralTabContent Display name form should submit form to change display name",
+          "error": "AssertionError: expected 1st \"vi.fn()\" call to have been called with [ 'new name' ], but called only 0 times"
+        }
+      ]
+    },
+    {
+      "file": "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+      "load_error": null,
+      "tests": [
+        {
+          "name": "ActionMenu delete flow calls deleteBrand and closes everything when confirming",
+          "error": "Error: expect(element).not.toBeInTheDocument()"
+        }
+      ]
+    }
+  ],
+  "reproduction": {
+    "command": [
+      "yarn",
+      "test",
+      "--project",
+      "frontend",
+      "--maxWorkers=4"
+    ],
+    "environment": {
+      "CI": "1",
+      "TZ": "UTC",
+      "NODE_ENV": "test"
+    },
+    "configuration": "Point the frontend project environment at this checkout\u2019s src/environment/vitest.mjs, retain environmentOptions.turboDom.url=https://account.wistia.io/, and append sample_files. Wistia test source and setup mocks were unchanged."
+  },
+  "limits": [
+    "This is the original 56-file compatibility sample, not the complete Wistia suite.",
+    "The 56-file before comparison uses 0.5.7; the fork is based on 0.5.8. The six targeted files were additionally reproduced as failing on unmodified 0.5.8.",
+    "Only JavaScript runtime files changed. Tests use the published 0.5.8 native parser artifact; the Rust parser was not modified or rebuilt.",
+    "History retains the existing synchronous traversal stub; this does not implement asynchronous popstate delivery or full browser navigation.",
+    "No package was published and Wistia remains on its existing default jsdom configuration."
+  ]
+}

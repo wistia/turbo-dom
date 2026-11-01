@@ -168,6 +168,8 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
   // `window.x = y` assignment writes to base, shadowing STATIC_BASE per-env.
   const base = {
     document,
+    // Snapshot before installGlobals or an interceptor replaces globalThis.fetch.
+    fetch: globalThis.fetch ? globalThis.fetch.bind(globalThis) : undefined,
     name: '',
     closed: false,
     // origin is lazy (per-env, captures url) — window.origin is rarely read, so the
@@ -186,6 +188,21 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    Option: () => {
+      function Option(text = '', value, defaultSelected = false, selected = false) {
+        const option = document.createElement('option');
+        option.text = String(text);
+        if (value !== undefined) option.value = String(value);
+        if (defaultSelected) option.setAttribute('selected', '');
+        option.selected = Boolean(selected);
+        return option;
+      }
+      Option.prototype = STATIC_BASE.HTMLOptionElement.prototype;
+      Object.defineProperty(Option, Symbol.hasInstance, {
+        value: (element) => element instanceof STATIC_BASE.HTMLOptionElement,
+      });
+      return Option;
+    },
     origin: () => new URL(url).origin,
     // subsystem grouping: history co-materializes with (and shares) location
     location: () => makeLocation(url),
@@ -264,7 +281,7 @@ export function setClock(fn) { __clock = typeof fn === 'function' ? fn : null; }
 // that calls btoa/atob doesn't throw.
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const turboBtoa = typeof globalThis.btoa === 'function'
-  ? (s) => globalThis.btoa(s)
+  ? globalThis.btoa.bind(globalThis)
   : typeof Buffer !== 'undefined'
     ? (s) => Buffer.from(String(s), 'binary').toString('base64')
     : (s) => {
@@ -279,7 +296,7 @@ const turboBtoa = typeof globalThis.btoa === 'function'
         return out;
       };
 const turboAtob = typeof globalThis.atob === 'function'
-  ? (s) => globalThis.atob(s)
+  ? globalThis.atob.bind(globalThis)
   : typeof Buffer !== 'undefined'
     ? (s) => Buffer.from(String(s), 'base64').toString('binary')
     : (s) => {
@@ -428,7 +445,6 @@ const STATIC_BASE = {
   Blob: BlobBase, File: TURBO_FILE, FileReader,
   AbortController: globalThis.AbortController, AbortSignal: globalThis.AbortSignal,
   TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder,
-  fetch: globalThis.fetch ? (...a) => globalThis.fetch(...a) : undefined,
   Headers: globalThis.Headers, Request: globalThis.Request, Response: globalThis.Response,
   FormData: TurboFormData, ReadableStream: globalThis.ReadableStream,
   crypto: globalThis.crypto, Crypto: globalThis.Crypto, SubtleCrypto: globalThis.SubtleCrypto,

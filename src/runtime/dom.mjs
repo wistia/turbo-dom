@@ -18,6 +18,15 @@ import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
+function clearRemovedFocus(node, childrenOnly = false) {
+  const doc = node.ownerDocument;
+  const active = doc && doc.__active;
+  if (!active || (childrenOnly && active === node)) return;
+  for (let current = active; current; current = current.parentNode || (current.__isShadowRoot && current.host)) {
+    if (current === node) { doc.__active = null; return; }
+  }
+}
+
 // Per-node query-result cache keyed by (selector, document version). querySelectorAll
 // returns a STATIC list per spec, so caching is safe until the next mutation bumps
 // Document.__version (which invalidates every cached query). Big win for the repeated
@@ -160,6 +169,7 @@ export class Node extends EventTarget {
     const i = kids.indexOf(node);
     if (i === -1) throw new Error('NotFoundError: node is not a child');
     const next = kids[i + 1] || null;
+    clearRemovedFocus(node);
     kids.splice(i, 1);
     node.parentNode = null;
     notifyMutation(this, 'childList', null, node, next);
@@ -287,6 +297,7 @@ export class Node extends EventTarget {
   // node object yet, so nothing can be holding it — inflating a whole child list just to
   // null out parent pointers would put an allocation on the React container-clear path.
   __detachKids() {
+    clearRemovedFocus(this, true);
     const kids = this.__kids;
     if (kids) for (let i = 0; i < kids.length; i++) kids[i].parentNode = null;
   }
@@ -836,6 +847,7 @@ export class Element extends Node {
     }
   }
   focus() {
+    if (!this.isConnected) return;
     const doc = this.ownerDocument;
     const prev = doc.__active;
     if (prev === this) return;

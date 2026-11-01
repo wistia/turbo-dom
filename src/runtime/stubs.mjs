@@ -157,9 +157,11 @@ export class MutationObserver {
   takeRecords() { const r = this.__records; this.__records = []; return r; }
 }
 
+const locationURLs = new WeakMap();
+
 export function makeLocation(href = 'http://localhost/') {
   const u = new URL(href);
-  return {
+  const location = {
     get href() { return u.href; }, set href(v) { /* navigation is a no-op in headless */ },
     get protocol() { return u.protocol; },
     get host() { return u.host; },
@@ -171,18 +173,37 @@ export function makeLocation(href = 'http://localhost/') {
     get origin() { return u.origin; },
     assign() {}, replace() {}, reload() {}, toString() { return u.href; },
   };
+  locationURLs.set(location, u);
+  return location;
 }
 
 export function makeHistory(location) {
   const stack = [{ state: null, url: location.href }];
   let idx = 0;
+  const currentURL = locationURLs.get(location);
+  const resolveURL = (url) => {
+    if (url == null) return location.href;
+    let next;
+    try { next = new URL(url, location.href); } catch { /* invalid URLs share the SecurityError below */ }
+    if (!next || next.origin !== currentURL.origin || next.username !== currentURL.username || next.password !== currentURL.password) {
+      const message = 'History cannot rewrite this document URL';
+      throw globalThis.DOMException
+        ? new globalThis.DOMException(message, 'SecurityError')
+        : Object.assign(new Error(message), { name: 'SecurityError' });
+    }
+    return next.href;
+  };
+  const activate = () => { currentURL.href = stack[idx].url; };
   return {
     get length() { return stack.length; },
     get state() { return stack[idx].state; },
-    pushState(state, _title, url) { stack.splice(idx + 1); stack.push({ state, url }); idx++; },
-    replaceState(state, _title, url) { stack[idx] = { state, url: url ?? stack[idx].url }; },
-    back() { if (idx > 0) idx--; },
-    forward() { if (idx < stack.length - 1) idx++; },
-    go(n) { idx = Math.max(0, Math.min(stack.length - 1, idx + (n || 0))); },
+    pushState(state, _title, url) { const href = resolveURL(url); stack.splice(idx + 1); stack.push({ state, url: href }); idx++; activate(); },
+    replaceState(state, _title, url) { const href = resolveURL(url); stack[idx] = { state, url: href }; activate(); },
+    back() { if (idx > 0) { idx--; activate(); } },
+    forward() { if (idx < stack.length - 1) { idx++; activate(); } },
+    go(n = 0) {
+      const next = idx + Math.trunc(Number(n));
+      if (Number.isFinite(next) && next >= 0 && next < stack.length) { idx = next; activate(); }
+    },
   };
 }
