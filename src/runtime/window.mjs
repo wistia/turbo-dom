@@ -12,6 +12,7 @@ import {
 } from './stubs.mjs';
 import { makeGetComputedStyle } from './cascade.mjs';
 import { CSSStyleSheet } from './cssom.mjs';
+import { NamedNodeMap } from './collections.mjs';
 import {
   Node, Element, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
   MutationObserver, DOMParser, XMLSerializer, ShadowRoot,
@@ -379,7 +380,7 @@ function makeXHR() {
 // to this after its tiny per-env `base`. Nothing here captures document/url/window.
 const STATIC_BASE = {
   // DOM + event constructors (cheap class refs)
-  Node, Element, Text, Comment, Document, DocumentFragment, DocumentType, EventTarget,
+  Node, Element, Text, Comment, Document, DocumentFragment, DocumentType, EventTarget, NamedNodeMap,
   ShadowRoot,
   Event, CustomEvent,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,

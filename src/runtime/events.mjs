@@ -218,11 +218,22 @@ export class EventTarget {
     }
     event._path = path;
 
+    let defaultActionTarget = this;
+    if (type === 'click' && event.bubbles && (event instanceof MouseEvent || event instanceof PointerEvent)) {
+      for (const node of path) {
+        const tag = node.localName;
+        if (tag === 'button' || tag === 'input' || tag === 'label' || tag === 'select' || tag === 'textarea' || (tag === 'a' && node.hasAttribute('href'))) {
+          defaultActionTarget = node;
+          break;
+        }
+      }
+    }
+
     // pre-click activation (WHATWG): checkbox/radio toggle BEFORE click listeners
     // run, so React's change detection sees the new value. Undone if preventDefault.
     let activation = null;
-    if (event.type === 'click' && typeof this.__preClickActivation === 'function') {
-      activation = this.__preClickActivation();
+    if (event.type === 'click' && typeof defaultActionTarget.__preClickActivation === 'function') {
+      activation = defaultActionTarget.__preClickActivation();
     }
 
     // relatedTarget (focus/mouseenter/mouseleave) is retargeted per listener
@@ -293,13 +304,13 @@ export class EventTarget {
     // default action) — user-event/React rely on these to see the new value.
     if (activation && event.defaultPrevented) activation.undo();
     else if (activation && activation.fireChange) {
-      this.dispatchEvent(new Event('input', { bubbles: true }));
-      this.dispatchEvent(new Event('change', { bubbles: true }));
+      defaultActionTarget.dispatchEvent(new Event('input', { bubbles: true }));
+      defaultActionTarget.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // remaining default actions (label→control, form submit) unless prevented
-    if (!event.defaultPrevented && typeof this.__runDefaultAction === 'function') {
-      this.__runDefaultAction(event);
+    if (!event.defaultPrevented && typeof defaultActionTarget.__runDefaultAction === 'function') {
+      defaultActionTarget.__runDefaultAction(event);
     }
     return !event.defaultPrevented;
   }

@@ -1,0 +1,188 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "6fcfebb4ac920bed11ddeab9e91cf56a0f0e398b",
+  "runtime_version": "0.5.8",
+  "wistia_commit": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+  "scope": "Resolve the six remaining Wistia compatibility failures using three parallel agents and integrated review.",
+  "fixes": [
+    {
+      "area": "Selectors and accessibility",
+      "changes": [
+        "Unsupported pseudo selectors throw SyntaxError, enabling jQuery custom-selector fallback.",
+        "Preserve forgiving is/where selector branches, strict not/has branches, uppercase pseudo names, and stylesheet error handling.",
+        "Provide a branded live NamedNodeMap and allocation-free Element.hasAttributes.",
+        "Add axe-core 4.12.1 and exercise real violation detection and remediation."
+      ]
+    },
+    {
+      "area": "Textarea and forms",
+      "changes": [
+        "Textarea defaultValue reflects child text and coerces assigned values to strings, preserving edited values.",
+        "Bubbling MouseEvent/PointerEvent clicks activate the nearest control for nested button content.",
+        "Respect canceled, non-bubbling, generic, disabled-control, and interactive-label cases."
+      ]
+    },
+    {
+      "area": "Scroll positions and dialogs",
+      "changes": [
+        "Retain finite numeric scroll offsets without synthetic layout clamping.",
+        "Stop advertising the unimplemented getAnimations query so existing Wistia animation feature detection runs its fallback."
+      ]
+    }
+  ],
+  "targeted_files": [
+    {
+      "file": "frontend/jquery/jquery-legacy-compat.vitest.js",
+      "passed_tests": 20
+    },
+    {
+      "file": "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+      "passed_tests": 6
+    },
+    {
+      "file": "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+      "passed_tests": 4
+    },
+    {
+      "file": "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+      "passed_tests": 2
+    },
+    {
+      "file": "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+      "passed_tests": 9
+    },
+    {
+      "file": "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+      "passed_tests": 6
+    }
+  ],
+  "targeted_results": {
+    "files": 6,
+    "passed_files": 6,
+    "passed_tests": 47,
+    "failed_tests": 0
+  },
+  "before": {
+    "files": 56,
+    "passed_files": 50,
+    "passed_tests": 424,
+    "failed_tests": 7
+  },
+  "after": {
+    "files": 56,
+    "passed_files": 56,
+    "passed_tests": 431,
+    "failed_tests": 0,
+    "uncollected_tests": 0
+  },
+  "fork_checks": {
+    "new_regression_tests": 23,
+    "node_tests_passed": 581,
+    "node_tests_skipped": 4,
+    "node_tests_failed": 0,
+    "skip_reason": "WASM builds absent; native parser used.",
+    "coverage_percent": {
+      "lines": 99.18,
+      "branches": 95.28,
+      "functions": 98.13
+    },
+    "vitest_passed": 29,
+    "jest_passed": 2
+  },
+  "query_throughput_smoke": {
+    "method": "Single isolated run of node bench/query.mjs per version on Linux ARM64 / Node 24.19.0. Development comparison libraries: jsdom29.1.1, happy-dom20.14.5. Not an end-to-end suite timing or statistically significant estimate.",
+    "before_commit": "6fcfebb",
+    "before_iters_per_second": {
+      "turbo_dom": 803430,
+      "jsdom": 1214,
+      "happy_dom": 253073
+    },
+    "after_iters_per_second": {
+      "turbo_dom": 800731,
+      "jsdom": 1184,
+      "happy_dom": 239249
+    }
+  },
+  "sample_files": [
+    "frontend/components/2025redesign/screenLayouts/GlobalActions/SideNav/SideNavButton.vitest.tsx",
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/components/Waveform/WaveformCanvas.vitest.tsx",
+    "frontend/components/chooser-v2/components/__tests__/ChooserChrome.vitest.tsx",
+    "frontend/jquery/jquery-legacy-compat.vitest.js",
+    "frontend/jquery/jquery-ready-timing.vitest.js",
+    "frontend/pricing/components/MapConnectionBanner/MapConnectionBannerView.vitest.tsx",
+    "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveAndRestore/RestoreMediaButton.vitest.jsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/colorOptionUtils.vitest.ts",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/CancelScreen/CancelPage.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/MotionKitSettings/motionKitListCache.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/TrimHandle.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/channelCreationNavState.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+    "frontend/singlePageApp/screens/CreateSocialClips/services/useGetFoldersService/useGetFoldersService.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/application/useSelectionAttributes.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/domain/lanes/track.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Registration/hooks/selectors.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/JoinYourOrgScreen/JoinYourOrgScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/common/WtwSurface.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/components/dataTable/cells/EmbedLocationCell.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts",
+    "frontend/vitest/noNetwork.vitest.mts",
+    "frontend/wistia-remotion/useTypedInputPropsForRoot.vitest.tsx"
+  ],
+  "reproduction": {
+    "command": [
+      "yarn",
+      "test",
+      "--project",
+      "frontend",
+      "--maxWorkers=4"
+    ],
+    "environment": {
+      "CI": "1",
+      "TZ": "UTC",
+      "NODE_ENV": "test"
+    },
+    "adapter": "Point frontend test.environment at the fork src/environment/vitest.mjs, retain environmentOptions.turboDom.url=https://account.wistia.io/, and append sample_files."
+  },
+  "limits": [
+    "No Wistia test source or expectations changed. Only a temporary environment configuration selected the fork.",
+    "The complete Wistia suite was not run; this covers the original 56-file compatibility sample.",
+    "Geometry remains synthetic; scroll methods and layout-based bounds are not implemented.",
+    "getAnimations is deliberately absent because Web Animations queries are unsupported. Wistia uses its existing animation-disabled test fallback.",
+    "The selector engine remains partial; these changes do not implement every native pseudo-class or make all malformed CSS grammar spec-strict.",
+    "End-to-end runtime measurements from docs/wistia-runtime-comparison.json describe the previous fork commit; they were not repeated for this follow-up.",
+    "The package was not published, and Wistia still defaults to jsdom."
+  ]
+}

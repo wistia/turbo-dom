@@ -455,6 +455,11 @@ export class Element extends Node {
     const doc = this.ownerDocument, buf = doc && doc.__buf;
     return (this.__attrIdx >= 0 && buf) ? buf.attrHas(this.__attrIdx, name) : false;
   }
+  hasAttributes() {
+    if (this.__attrs !== undefined) return this.__attrs.length > 0;
+    const doc = this.ownerDocument, buf = doc && doc.__buf;
+    return (this.__attrIdx >= 0 && buf) ? buf.hasAttrs(this.__attrIdx) : false;
+  }
   getAttributeNames() { return (this.__attrs ?? (this.__attrs = this.__buildAttrs())).map((a) => a.name); }
   setAttribute(name, value) {
     if (!this.__ns) name = ('' + name).toLowerCase();
@@ -575,8 +580,8 @@ export class Element extends Node {
     }
     if (this.__selStart != null) { this.__selStart = Math.min(this.__selStart, this.__value.length); this.__selEnd = Math.min(this.__selEnd, this.__value.length); }
   }
-  get defaultValue() { return this.getAttribute('value') ?? ''; }
-  set defaultValue(v) { this.setAttribute('value', v); }
+  get defaultValue() { return this.localName === 'textarea' ? this.textContent : (this.getAttribute('value') ?? ''); }
+  set defaultValue(v) { if (this.localName === 'textarea') this.textContent = String(v); else this.setAttribute('value', v); }
   get valueAsNumber() { const v = this.value; return v === '' || v == null ? NaN : Number(v); }
   set valueAsNumber(n) { this.value = String(n); }
   get valueAsDate() { const v = this.value; const d = v ? new Date(v) : null; return d && !isNaN(d) ? d : null; }
@@ -803,7 +808,7 @@ export class Element extends Node {
   }
   // pre-click activation (runs BEFORE click listeners; undone if preventDefault)
   __preClickActivation() {
-    if (this.localName !== 'input') return null;
+    if (this.localName !== 'input' || this.disabled) return null;
     const t = (this.getAttribute('type') || 'text').toLowerCase();
     // Write the internal field directly — NOT via the `checked` setter, which
     // React wraps with its value-tracker. Going through the setter would update
@@ -836,9 +841,11 @@ export class Element extends Node {
   __runDefaultAction(e) {
     if (e.type !== 'click') return;
     if (this.localName === 'input') {
+      if (this.disabled) return;
       const t = (this.getAttribute('type') || 'text').toLowerCase();
       if (t === 'submit') { const f = this.closest('form'); if (f) f.requestSubmit(); }
     } else if (this.localName === 'button') {
+      if (this.disabled) return;
       const t = (this.getAttribute('type') || 'submit').toLowerCase();
       if (t === 'submit') { const f = this.closest('form'); if (f) f.requestSubmit(); }
     } else if (this.localName === 'label') {
@@ -879,7 +886,10 @@ export class Element extends Node {
   get clientWidth() { return synthWidth(this); } get clientHeight() { return synthHeight(this); }
   get clientTop() { return 0; } get clientLeft() { return 0; }
   get scrollWidth() { return synthWidth(this); } get scrollHeight() { return synthHeight(this); }
-  get scrollTop() { return 0; } set scrollTop(_v) {} get scrollLeft() { return 0; } set scrollLeft(_v) {}
+  get scrollTop() { return this.__scrollTop ?? 0; }
+  set scrollTop(value) { const offset = Number(value); this.__scrollTop = Number.isFinite(offset) ? offset : 0; }
+  get scrollLeft() { return this.__scrollLeft ?? 0; }
+  set scrollLeft(value) { const offset = Number(value); this.__scrollLeft = Number.isFinite(offset) ? offset : 0; }
 
   // namespaced attributes
   getAttributeNS(_ns, name) { return this.getAttribute(name); }
@@ -922,10 +932,9 @@ export class Element extends Node {
   get hreflang() { return this.getAttribute('hreflang') ?? ''; }
   get target() { return this.getAttribute('target') ?? ''; } set target(v) { this.setAttribute('target', v); }
 
-  // pointer capture + animations (no-op honest stubs)
+  // pointer capture + animation playback (no-op honest stubs)
   setPointerCapture() {} releasePointerCapture() {} hasPointerCapture() { return false; }
   animate() { return { play() {}, pause() {}, cancel() {}, finish() {}, finished: Promise.resolve(), onfinish: null, cancel_: null }; }
-  getAnimations() { return []; }
   requestFullscreen() { return Promise.resolve(); }
 
   // canvas (no raster backend — honest no-op context)

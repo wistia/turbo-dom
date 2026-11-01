@@ -49,10 +49,10 @@ test('form-state pseudo-classes read live properties', () => {
   assert.ok(document.getElementById('o').matches(':checked')); // selected option
 });
 
-test('unknown pseudo never matches (honest)', () => {
+test('unknown pseudo throws so selector extensions can fall back', () => {
   const { document } = fresh();
   document.body.innerHTML = '<div id="d"></div>';
-  assert.equal(document.getElementById('d').matches(':totally-made-up'), false);
+  assert.throws(() => document.getElementById('d').matches(':totally-made-up'), { name: 'SyntaxError' });
 });
 
 // ---------------------------------------------------------- DOM edges ----
@@ -452,13 +452,14 @@ test('Element synthetic geometry + honest scroll/pointer/animation stubs', () =>
   assert.equal(el.offsetWidth, r.width); assert.equal(el.offsetHeight, r.height);
   assert.equal(el.clientWidth, r.width); assert.equal(el.clientHeight, r.height);
   assert.equal(el.scrollWidth, r.width); assert.equal(el.scrollHeight, r.height);
-  // positions + offsetParent stay honest zero/null (no real layout)
+  // layout offsets + offsetParent stay honest zero/null (no real layout)
   assert.equal(el.offsetTop, 0); assert.equal(el.offsetLeft, 0);
   assert.equal(el.offsetParent, null);
   assert.equal(el.clientTop, 0); assert.equal(el.clientLeft, 0);
+  // Scroll offsets retain explicit assignments without layout-based clamping.
   assert.equal(el.scrollTop, 0); assert.equal(el.scrollLeft, 0);
-  el.scrollTop = 50; el.scrollLeft = 50; // setters are no-ops
-  assert.equal(el.scrollTop, 0); assert.equal(el.scrollLeft, 0);
+  el.scrollTop = 50; el.scrollLeft = 50;
+  assert.equal(el.scrollTop, 50); assert.equal(el.scrollLeft, 50);
   // pointer capture honest stubs
   assert.equal(el.setPointerCapture(1), undefined);
   assert.equal(el.releasePointerCapture(1), undefined);
@@ -501,7 +502,7 @@ test('Element.animate returns a controllable Animation-like stub', async () => {
   assert.equal(anim.finish(), undefined);
   assert.equal(anim.onfinish, null);
   await anim.finished; // resolves
-  assert.deepEqual(el.getAnimations(), []);
+  assert.equal(typeof el.getAnimations, 'undefined');
 });
 
 test('Element.requestFullscreen resolves; toDataURL is the empty data URL', async () => {

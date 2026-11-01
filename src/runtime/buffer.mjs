@@ -97,6 +97,7 @@ export class Buffer {
     for (let k = 0; k < count; k++) if (attrNames[attrNameId[start + k]] === name) return true;
     return false;
   }
+  hasAttrs(i) { return this.soa.attrCount[i] > 0; }
   attrs(i) {
     const start = this.soa.attrStart[i];
     if (start < 0) return [];

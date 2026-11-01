@@ -124,6 +124,11 @@ to set up `document`/`window` on any global object.
 
 ## Compatibility
 
+The Wistia fork's original 56-file compatibility sample passes **431/431 tests**
+after the browser API fixes, including all six previously failing files. This
+does not cover the complete Wistia suite. See the [validation results](docs/wistia-six-file-validation.json)
+for the file selection, regression tests, and remaining runtime limitations.
+
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
 | html5lib-tests conformance | **99.72%** | 37.35% | 97.03% |
@@ -175,6 +180,18 @@ per-element `classList`/`split`/regex), and `querySelectorAll`/`getElementsBy*`/
 `querySelectorAll` list is safe to reuse until the next mutation. So the repeated
 queries RTL/`findBy`/`waitFor` run against an unchanged tree are near-free, and
 `getByLabelText` went from O(n²) (1.3 ms) to ~270 µs.
+
+Wistia fork query smoke check on Linux ARM64, Node 24.19.0 (`npm run bench:query`):
+
+| Runtime | Iterations per second |
+|---|---:|
+| turbo-dom, before these fixes | 803,430 |
+| turbo-dom, after these fixes | 800,731 |
+| jsdom 29.1.1, same post-fix run | 1,184 |
+| happy-dom 20.14.5, same post-fix run | 239,249 |
+
+These are single-run microbenchmark observations, not end-to-end suite timings.
+The [validation record](docs/wistia-six-file-validation.json) includes both runs.
 
 ## How it works
 

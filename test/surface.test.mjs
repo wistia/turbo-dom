@@ -45,7 +45,7 @@ test('Element synthetic geometry + isConnected + getRootNode', () => {
   assert.ok(root.offsetWidth > 0);          // synthetic box model, non-zero
   assert.ok(root.clientHeight > 0);
   assert.equal(root.offsetWidth, root.clientWidth); // internally consistent
-  assert.equal(root.scrollTop, 0);          // scroll offsets stay honest zero
+  assert.equal(root.scrollTop, 0);          // scroll offsets default to zero
   assert.equal(root.isConnected, true);
   const detached = document.createElement('div');
   assert.equal(detached.isConnected, false);

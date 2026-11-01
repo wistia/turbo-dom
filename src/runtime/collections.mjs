@@ -1,6 +1,13 @@
 // Live collections. Each reads its backing array on every access, so they
 // reflect mutations immediately — the exact place happy-dom bleeds liveness bugs.
 
+const namedNodeMaps = new WeakSet();
+
+export class NamedNodeMap {
+  constructor() { throw new TypeError('Illegal constructor'); }
+  static [Symbol.hasInstance](value) { return namedNodeMaps.has(value); }
+}
+
 function makeLive(getArray, extra = {}, tag = 'NodeList') {
   // Plain-object target: it has no non-configurable own keys, so ownKeys can
   // report indices + length without tripping the proxy invariant (a function
@@ -69,7 +76,7 @@ export function liveHTMLCollection(getArray) {
 // every access, so React 19's `while (attrs.length) removeAttributeNode(attrs[0])`
 // loop sees the map shrink and terminates (a snapshot array never would).
 export function liveNamedNodeMap(el, getArray) {
-  return makeLive(getArray, {
+  const map = makeLive(getArray, {
     getNamedItem: (arr) => (name) => arr.find((a) => a.name === name) ?? null,
     getNamedItemNS: (arr) => (_ns, name) => arr.find((a) => a.name === name) ?? null,
     setNamedItem: () => (attr) => el.setAttributeNode(attr),
@@ -77,4 +84,6 @@ export function liveNamedNodeMap(el, getArray) {
     removeNamedItem: () => (name) => el.removeAttributeNode({ name }),
     removeNamedItemNS: () => (_ns, name) => el.removeAttributeNode({ name }),
   }, 'NamedNodeMap');
+  namedNodeMaps.add(map);
+  return map;
 }

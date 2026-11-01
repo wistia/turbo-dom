@@ -180,7 +180,9 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
   lists): measure 0 → setState → re-render → measure 0 → ∞. So **size** is a cheap synthetic box
   model: block fills parent content width (root = `defaultView.innerWidth` || 1024); inline
   shrink-wraps text (`len*8`, capped at parent); height = stacked element-children or
-  `lineCount*18`. **Positions stay 0** (top/left/offsetTop/scrollTop) — only size is faked.
+  `lineCount*18`. **Layout positions stay 0** (top/left/offsetTop) — only size is faked.
+  `scrollTop`/`scrollLeft` default to 0 and retain explicit assignments without layout-based
+  clamping; no scroll bounds are calculated.
   The three required properties: non-zero, **STABLE per DOM state** (so the measure loop sees the
   same value twice and settles), internally consistent (`right-left===width`, children fit
   parents). Memoized per node on `__rw`/`__rh` keyed by `Document.__version` (like
@@ -227,6 +229,9 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
 - `getByLabelText` was O(n²) (element.labels → getElementsByTagName('label') per element);
   the caches took it 1342→~270µs.
 Numbers in README.md — refresh both (bench against jsdom AND happy-dom) if you touch hot paths.
+The Wistia fork's Linux ARM64 query smoke snapshot is 800,731 iters/sec versus jsdom
+29.1.1 at 1,184 and happy-dom 20.14.5 at 239,249 (Node 24.19.0, single run).
+See `docs/wistia-six-file-validation.json` for the before/after observations and scope.
 - **Parse memoization (index.mjs `parseBufferCached`).** The SoA buffer is READ-ONLY — every
   mutation goes to a Document's own `__kids`/`__attrs`/`__cache` overlay, never the buffer — so
   the same buffer backs many Documents. Suites call setup with the same shell HTML per file →

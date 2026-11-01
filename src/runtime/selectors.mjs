@@ -28,6 +28,19 @@
 //   { k:'pseudo', name, arg }           ':name' / ':name( arg )' (arg null ⇒ no parens)
 
 const NAME_CHAR = /[a-zA-Z0-9_-]/;
+const KNOWN_PSEUDOS = new Set([
+  'not', 'is', 'where', 'has', 'first-child', 'last-child', 'only-child', 'empty', 'root',
+  'checked', 'disabled', 'enabled', 'required', 'optional', 'read-only', 'read-write', 'selected',
+  'nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type', 'first-of-type', 'last-of-type', 'only-of-type',
+  'active', 'any-link', 'autofill', 'blank', 'buffering', 'current', 'default', 'defined', 'dir',
+  'focus', 'focus-visible', 'focus-within', 'fullscreen', 'future', 'host', 'host-context', 'hover',
+  'indeterminate', 'in-range', 'invalid', 'lang', 'link', 'local-link', 'modal', 'muted', 'open',
+  'out-of-range', 'past', 'paused', 'picture-in-picture', 'placeholder-shown', 'playing', 'popover-open',
+  'scope', 'seeking', 'stalled', 'state', 'target', 'target-within', 'user-invalid', 'user-valid',
+  'valid', 'visited', 'volume-locked',
+  'after', 'backdrop', 'before', 'cue', 'cue-region', 'file-selector-button', 'first-letter',
+  'first-line', 'marker', 'part', 'placeholder', 'selection', 'slotted',
+]);
 function isTypeStart(c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
@@ -118,7 +131,7 @@ function tokenize(src) {
     if (c === ':') {
       let j = i + 1;
       while (j < n && (isTypeStart(src[j]) || src[j] === '-')) j++;
-      const name = src.slice(i + 1, j);
+      const name = src.slice(i + 1, j).toLowerCase();
       let arg = null;
       if (j < n && src[j] === '(') {
         // balanced parens (quotes respected) so a nested ':not(:nth-child(2))'
@@ -157,7 +170,13 @@ function parseCompound(tokens, pos, end) {
     else if (t.k === 'id') { compound.id = t.v; }
     else if (t.k === 'class') { compound.classes.push(t.v); }
     else if (t.k === 'attr') { compound.attrs.push({ name: t.name, match: t.match }); }
-    else if (t.k === 'pseudo') { compound.pseudos.push({ name: t.name, arg: t.arg }); }
+    else if (t.k === 'pseudo') {
+      if (t.name && !KNOWN_PSEUDOS.has(t.name)) throw new SyntaxError(`Unsupported pseudo-class: ${t.name}`);
+      if (t.name === 'not') parseSelectorList(t.arg || '');
+      else if (t.name === 'has') parseRelativeSelectorList(t.arg);
+      else if (t.name === 'is' || t.name === 'where') parseForgivingSelectorList(t.arg);
+      compound.pseudos.push({ name: t.name, arg: t.arg });
+    }
     else break; // ws / comb / comma ends the compound
     pos++; matched = true;
   }
@@ -240,6 +259,25 @@ export function parseSelectorList(selector) {
   return parsed;
 }
 
+const __forgivingCache = new Map();
+function parseForgivingSelectorList(selector) {
+  const src = selector || '';
+  const hit = __forgivingCache.get(src);
+  if (hit !== undefined) return hit;
+  const parsed = [];
+  let tokens;
+  try { tokens = tokenize(src); } catch { return parsed; }
+  for (const [lo, hi] of splitTopLevelSegments(tokens)) {
+    try {
+      const complex = parseComplexTokens(tokens, lo, hi);
+      if (complex !== null) parsed.push(complex);
+    } catch { /* forgiving selector lists discard invalid branches */ }
+  }
+  if (__forgivingCache.size > 10000) __forgivingCache.clear();
+  __forgivingCache.set(src, parsed);
+  return parsed;
+}
+
 // :has() relative-selector-list parse + cache. Each top-level comma segment may
 // begin with a combinator ('>'/'+'/'~'); absent ⇒ descendant. The remainder is a
 // normal complex (reused parseComplex). Segments yielding no complex are dropped.
@@ -293,7 +331,7 @@ function matchPseudo(el, p) {
     // specificity difference is a cascade concern, out of scope here.
     case 'is':
     case 'where':
-      return parseSelectorList(p.arg).some((cx) => matchComplex(el, cx));
+      return parseForgivingSelectorList(p.arg).some((cx) => matchComplex(el, cx));
     // :has() — relational. SOME relative selector finds a matching element
     // reachable from `el` per its leading combinator, scoped to `el`.
     case 'has':
@@ -342,7 +380,7 @@ function matchPseudo(el, p) {
     case 'only-of-type':
       return typeCount(el) === 1;
     default:
-      return false; // unknown pseudo: never matches (honest, not a silent true)
+      return false; // recognized but unsupported pseudo-class or pseudo-element
   }
 }
 
