@@ -1,3 +1,5 @@
+import { canonicalizeColor } from './color.mjs';
+
 const LENGTH_PROPS = new Set([
   'width', 'height', 'min-width', 'max-width', 'min-height', 'max-height',
   'top', 'right', 'bottom', 'left', 'inset', 'inset-block', 'inset-inline',
@@ -20,6 +22,35 @@ export function normalizeZeroLengths(property, value) {
   if (!COMPOUND_LENGTH_PROPS.has(property)) return ZERO_NUMBER.test(trimmed) ? '0px' : trimmed;
   if (/[()'\"]/.test(trimmed)) return trimmed;
   return trimmed.replace(ZERO_LENGTH, (_, separator) => `${separator}0px`);
+}
+
+export function backgroundImage(value) {
+  const text = value.trim();
+  if (canonicalizeColor(text, true) || /^currentcolor$/i.test(text)) return 'none';
+  let index = 0;
+  while (index < text.length) {
+    const rest = text.slice(index);
+    const image = /^(?:url|image-set|(?:repeating-)?(?:linear|radial|conic)-gradient)\(/i.exec(rest);
+    if (image) {
+      index += image[0].length;
+      let depth = 1, quote = '';
+      while (index < text.length && depth) {
+        const character = text[index++];
+        if (character === '\\') { index++; continue; }
+        if (quote) { if (character === quote) quote = ''; continue; }
+        if (character === '"' || character === "'") quote = character;
+        else if (character === '(') depth++;
+        else if (character === ')') depth--;
+      }
+      if (depth || quote) return undefined;
+    } else if (/^none\b/i.test(rest)) index += 4;
+    else return undefined;
+    while (/\s/.test(text[index] || '') && index < text.length) index++;
+    if (index === text.length) return text;
+    if (text[index++] !== ',') return undefined;
+    while (/\s/.test(text[index] || '') && index < text.length) index++;
+  }
+  return undefined;
 }
 
 export function splitDeclarations(text) {

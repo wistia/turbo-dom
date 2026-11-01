@@ -38,7 +38,7 @@ export class Event {
   stopImmediatePropagation() { this._stopPropagation = true; this._stopImmediate = true; }
   get defaultPrevented() { return this._defaultPrevented; }
   preventDefault() { if (this.cancelable && !this._passiveListener) this._defaultPrevented = true; }
-  get returnValue() { return !this.defaultPrevented; }
+  get returnValue() { return !this._defaultPrevented; }
   set returnValue(v) { if (v === false) this.preventDefault(); }
 
   composedPath() { return this._path ? this._path.slice() : []; }
@@ -324,17 +324,17 @@ export class EventTarget {
     // canceled activation: undo the pre-click toggle if default was prevented.
     // Otherwise a checkbox/radio toggle fires input then change (activation
     // default action) — user-event/React rely on these to see the new value.
-    if (activation && event.defaultPrevented) activation.undo();
+    if (activation && event._defaultPrevented) activation.undo();
     else if (activation && activation.fireChange) {
       defaultActionTarget.dispatchEvent(new Event('input', { bubbles: true }));
       defaultActionTarget.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // remaining default actions (label→control, form submit) unless prevented
-    if (!event.defaultPrevented && typeof defaultActionTarget.__runDefaultAction === 'function') {
+    if (!event._defaultPrevented && typeof defaultActionTarget.__runDefaultAction === 'function') {
       defaultActionTarget.__runDefaultAction(event);
     }
-    return !event.defaultPrevented;
+    return !event._defaultPrevented;
   }
 }
 

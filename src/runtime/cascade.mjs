@@ -17,7 +17,7 @@
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations, backgroundImage } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -56,8 +56,13 @@ function setProp(map, name, val, important = false) {
     if (width !== undefined) { assignProp(map, 'border-width', width, important); for (const s of ['top', 'right', 'bottom', 'left']) assignProp(map, `border-${s}-width`, width, important); }
     if (style !== undefined) assignProp(map, 'border-style', style, important);
     if (color !== undefined) assignProp(map, 'border-color', color, important);
-  } else if (name === 'background' && !/\s/.test(val.trim())) {
-    assignProp(map, 'background-color', val.trim(), important);
+  } else if (name === 'background') {
+    const image = backgroundImage(val);
+    if (image !== undefined) {
+      assignProp(map, 'background-image', image, important);
+      const color = canonicalizeColor(val, true) || /^currentcolor$/i.test(val) ? val.trim() : 'transparent';
+      assignProp(map, 'background-color', color, important);
+    }
   }
 }
 

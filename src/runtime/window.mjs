@@ -15,7 +15,7 @@ import { CSSStyleSheet } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
 import { MessageChannel, MessagePort, cloneMessage } from './messaging.mjs';
 import {
-  Node, Element, CanvasElement, MediaElement, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
+  Node, Element, CanvasElement, MediaElement, MEDIA_CONSTANTS, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
   MutationObserver, DOMParser, XMLSerializer, ShadowRoot,
 } from './dom.mjs';
 import {
@@ -49,7 +49,7 @@ class TurboFormData {
     if (form === undefined) return;
     if (submitter !== null) {
       if (!this.__isSubmitButton(submitter)) throw new TypeError('FormData submitter must be a submit button');
-      if (this.__formOwner(submitter) !== form) {
+      if (submitter.form !== form) {
         const message = 'FormData submitter does not belong to this form';
         throw globalThis.DOMException
           ? new globalThis.DOMException(message, 'NotFoundError')
@@ -67,7 +67,7 @@ class TurboFormData {
       const root = form.getRootNode();
       for (const control of root.querySelectorAll('input,select,textarea,button')) {
         if (control.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue;
-        if (this.__formOwner(control) !== form || this.__excluded(control)) continue;
+        if (control.form !== form || this.__excluded(control)) continue;
         const tag = control.localName;
         const type = String(control.type || '').toLowerCase();
         const name = control.getAttribute('name') || '';
@@ -128,22 +128,6 @@ class TurboFormData {
     return control.localName === 'input' ? type === 'submit' || type === 'image'
       : control.localName === 'button' && type !== 'button' && type !== 'reset';
   }
-  __formOwner(control) {
-    const id = control.getAttribute('form');
-    if (id !== null) {
-      if (!id) return null;
-      const root = control.getRootNode();
-      let candidate = root.nodeType === 1 && root.id === id ? root : null;
-      if (!candidate && root.getElementById) candidate = root.getElementById(id);
-      else if (!candidate) {
-        for (const element of root.querySelectorAll('[id]')) {
-          if (element.id === id) { candidate = element; break; }
-        }
-      }
-      return candidate && candidate.localName === 'form' ? candidate : null;
-    }
-    return control.closest('form');
-  }
   __excluded(control) {
     if (control.disabled) return true;
     for (let parent = control.parentElement; parent; parent = parent.parentElement) {
@@ -198,6 +182,9 @@ function tagClass(matcher, prototype = Element.prototype) {
   // vi.spyOn(HTMLAnchorElement.prototype, 'click')); instanceof is decided by
   // the tag matcher below, not the prototype chain.
   C.prototype = prototype;
+  if (prototype === MediaElement.prototype) {
+    for (const [name, value] of Object.entries(MEDIA_CONSTANTS)) Object.defineProperty(C, name, { value, enumerable: true });
+  }
   Object.defineProperty(C, Symbol.hasInstance, {
     value: (o) => o != null && o.nodeType === 1 && test(o.localName),
   });

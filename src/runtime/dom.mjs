@@ -16,7 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations, backgroundImage } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -890,14 +890,11 @@ export class Element extends Node {
   // default actions applied post-dispatch when not preventDefault'd
   __runDefaultAction(e) {
     if (e.type !== 'click') return;
-    if (this.localName === 'input') {
+    if (this.localName === 'input' || this.localName === 'button') {
       if (this.disabled) return;
-      const t = (this.getAttribute('type') || 'text').toLowerCase();
-      if (t === 'submit') { const f = this.closest('form'); if (f) f.requestSubmit(); }
-    } else if (this.localName === 'button') {
-      if (this.disabled) return;
-      const t = (this.getAttribute('type') || 'submit').toLowerCase();
-      if (t === 'submit') { const f = this.closest('form'); if (f) f.requestSubmit(); }
+      const t = (this.getAttribute('type') || (this.localName === 'button' ? 'submit' : 'text')).toLowerCase();
+      if (t === 'submit') this.form?.requestSubmit();
+      else if (t === 'reset') this.form?.reset();
     } else if (this.localName === 'label') {
       const c = this.control;
       if (c && c !== e.target) c.click();
@@ -1033,10 +1030,29 @@ export class Element extends Node {
   assignedElements(options) { return this.assignedNodes(options).filter((n) => n.nodeType === ELEMENT_NODE); }
 
   // forms
-  get form() { return this.closest ? this.closest('form') : null; }
+  get form() {
+    const id = this.getAttribute('form');
+    if (id === null) return this.closest('form');
+    if (!id) return null;
+    const root = this.getRootNode();
+    let candidate = root.nodeType === ELEMENT_NODE && root.id === id ? root : null;
+    if (!candidate && root.getElementById) candidate = root.getElementById(id);
+    else if (!candidate) {
+      for (const element of root.querySelectorAll('[id]')) {
+        if (element.id === id) { candidate = element; break; }
+      }
+    }
+    return candidate?.localName === 'form' && !candidate.__ns ? candidate : null;
+  }
   get elements() {
     if (this.localName !== 'form') return undefined;
-    return liveHTMLCollection(() => collectByTag(this, '*').filter((e) => /^(input|select|textarea|button|fieldset|output)$/.test(e.localName)));
+    return liveHTMLCollection(() => {
+      const elements = [];
+      for (const element of this.getRootNode().querySelectorAll('input,select,textarea,button,fieldset,output')) {
+        if (element.form === this) elements.push(element);
+      }
+      return elements;
+    });
   }
   submit() { if (this.localName === 'form') this.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }
   requestSubmit() { this.submit(); }
@@ -1053,7 +1069,8 @@ export class Element extends Node {
       } else if (tag === 'textarea') {
         el.__value = el.textContent;
       } else if (tag === 'select') {
-        for (const o of el.getElementsByTagName('option')) o.__selected = o.hasAttribute('selected');
+        for (const option of el.options) { option.__selected = option.hasAttribute('selected'); option.__selectedDirty = false; }
+        normalizeSelect(el, true);
       }
     }
   }
@@ -1087,6 +1104,11 @@ function mediaNumber(value) {
 function queueMediaEvent(element, type) {
   Promise.resolve().then(() => element.dispatchEvent(new Event(type)));
 }
+
+export const MEDIA_CONSTANTS = Object.freeze({
+  NETWORK_EMPTY: 0, NETWORK_IDLE: 1, NETWORK_LOADING: 2, NETWORK_NO_SOURCE: 3,
+  HAVE_NOTHING: 0, HAVE_METADATA: 1, HAVE_CURRENT_DATA: 2, HAVE_FUTURE_DATA: 3, HAVE_ENOUGH_DATA: 4,
+});
 
 // Virtual controls only: no decoding, resource fetching, or automatic time advancement.
 export class MediaElement extends Element {
@@ -1131,6 +1153,11 @@ export class MediaElement extends Element {
     if (changed) queueMediaEvent(this, 'emptied');
   }
   canPlayType() { return ''; }
+}
+
+for (const [name, value] of Object.entries(MEDIA_CONSTANTS)) {
+  Object.defineProperty(MediaElement, name, { value, enumerable: true });
+  Object.defineProperty(MediaElement.prototype, name, { value, enumerable: true });
 }
 
 // ------------------------------------------------------------- SVGElement ----
@@ -1606,6 +1633,7 @@ const SHORTHAND_OF = {
 };
 function styleGet(values, prop) {
   let v = values.get(prop);
+  if (v === undefined && prop === 'background-image' && values.has('background')) v = backgroundImage(values.get('background'));
   if (v === undefined) {
     const sh = SHORTHAND_OF[prop];
     if (sh) { const s = values.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
