@@ -148,7 +148,9 @@ transfers and iframe lifetimes, and CSS priority/custom-property inheritance. Th
 
 A [third compatibility sample](docs/wistia-wave3-compatibility.json) covers 200
 additional files: jsdom passes 1,655 tests; the fork passes 1,651 and reproduces four
-new failures in isolation. Those failures remain open.
+new failures in isolation. All four are now fixed: the fork passes 1,655 tests in
+that sample and 3,856 in the combined 457-file check, with only the deferred
+custom-element failure. See the [fix validation](docs/wistia-wave3-fixes-validation.json).
 
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
@@ -212,15 +214,17 @@ Wistia fork query smoke check on Linux ARM64, Node 24.19.0 (`npm run bench:query
 | turbo-dom, after review fixes | 837,401 |
 | turbo-dom, after second review fixes | 760,626 |
 | turbo-dom, remaining-gap improvements | 808,784 |
-| jsdom 29.1.1, latest run | 1,228 |
-| happy-dom 20.14.5, latest run | 255,548 |
+| turbo-dom, third sample fixes | 818,714 |
+| jsdom 29.1.1, latest run | 1,164 |
+| happy-dom 20.14.5, latest run | 248,143 |
 
 These are single-run microbenchmark observations, not end-to-end suite timings.
 The [validation record](docs/wistia-six-file-validation.json) includes the initial runs; the [follow-up record](docs/wistia-wave2-fixes-validation.json)
 includes the second compatibility smoke check; the
 [review-fix record](docs/wistia-review-fixes-validation.json) includes the first review run.
 The [second review-fix record](docs/wistia-review2-fixes-validation.json) includes its review run. The
-[remaining-gaps record](docs/wistia-remaining-gaps-validation.json) includes the latest run.
+[remaining-gaps record](docs/wistia-remaining-gaps-validation.json) includes its integrated run; the
+[third sample fix record](docs/wistia-wave3-fixes-validation.json) includes the latest run.
 
 ## How it works
 
