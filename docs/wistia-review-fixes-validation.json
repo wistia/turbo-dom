@@ -89,7 +89,7 @@
       },
       "limits": "Repeated-read microbenchmark only; not an end-to-end Wistia runtime estimate. Shared machine load varied between runs."
     },
-    "query_smoke": {
+    "loaded_query_smoke": {
       "command": "npm run bench:query",
       "iterations_per_second": {
         "turbo_dom": 809999,
@@ -97,7 +97,92 @@
         "happy_dom_20_14_5": 234296
       },
       "limits": "Ran while the Wistia integration sample was active. Smoke check only; do not compare absolute values to a quiet benchmark or replace the published query snapshot."
+    },
+    "query_smoke": {
+      "command": "npm run bench:query",
+      "iterations_per_second": {
+        "turbo_dom": 837401,
+        "jsdom_29_1_1": 1222,
+        "happy_dom_20_14_5": 247665
+      },
+      "limits": "Single run after integration and native gates completed. Query microbenchmark only; not an end-to-end suite speed claim."
     }
   },
-  "wistia_integration": "Root agent is running the same 63-file frontend sample (original 56 plus seven follow-up regression files); results will be recorded separately after completion."
+  "wistia_integration": {
+    "scope": "Original 56-file sample plus seven follow-up regression files; custom-element lifecycle remains excluded. This does not rerun the entire 257-file audit or full application suite.",
+    "files": 63,
+    "passed_files": 63,
+    "failed_files": 0,
+    "passed_tests": 519,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "workers": 3,
+    "reproduction": "ASDF_NODEJS_VERSION=24.19.0 node bench/wistia-compatibility.mjs --wistia PATH --files docs/wistia-review-fixes-validation.json --output OUTPUT --workers 3 --only fork"
+  },
+  "tested_fork_commit": "89dcc83b5380b4a7118edb8a6b24d20d8c003fea",
+  "files": [
+    "frontend/components/2025redesign/screenLayouts/GlobalActions/SideNav/SideNavButton.vitest.tsx",
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/components/Waveform/WaveformCanvas.vitest.tsx",
+    "frontend/components/chooser-v2/components/__tests__/ChooserChrome.vitest.tsx",
+    "frontend/jquery/jquery-legacy-compat.vitest.js",
+    "frontend/jquery/jquery-ready-timing.vitest.js",
+    "frontend/pricing/components/MapConnectionBanner/MapConnectionBannerView.vitest.tsx",
+    "frontend/pricing/components/StartTrialButton/StartTrialButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/pushButtonFactories/FactoriesList/FactoriesList.vitest.tsx",
+    "frontend/singlePageApp/components/ArchiveAndRestore/RestoreMediaButton.vitest.jsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/colorOptionUtils.vitest.ts",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/components/uploader/UploadFileView/UploadFileListViewImproved.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/ui/brand/card/actionmenu/ActionMenu.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/CancelScreen/CancelPage.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/MotionKitSettings/motionKitListCache.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/TrimHandle.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/timeline/useTrimTipAnchor.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/widgets/EditableTextWidget.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelManage/channelCreationNavState.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/CreateSocialClips/domain/layouts.vitest.ts",
+    "frontend/singlePageApp/screens/CreateSocialClips/services/useGetFoldersService/useGetFoldersService.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/application/useSelectionAttributes.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/domain/lanes/track.vitest.ts",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/components/Settings/GeneralTabContent.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/test/liveSession/scenarios/screenShareIsolation.behavior.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Registration/hooks/selectors.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/CommentsControl/CommentsControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaPageCustomize/ui/MediaPageCustomizePanel/sections/ControlsSection/SpeakersControl/SpeakersControl.vitest.tsx",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/JoinYourOrgScreen/JoinYourOrgScreen.vitest.tsx",
+    "frontend/singlePageApp/screens/WelcomeScreen/common/WtwSurface.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/components/dataTable/cells/EmbedLocationCell.vitest.tsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts",
+    "frontend/vitest/noNetwork.vitest.mts",
+    "frontend/wistia-remotion/useTypedInputPropsForRoot.vitest.tsx",
+    "frontend/mcpAppSandbox/sandboxProxy.vitest.ts",
+    "frontend/components/BackgroundColorPicker/BackgroundColorPicker.vitest.tsx",
+    "frontend/components/ColorPicker/ColorPicker.vitest.tsx",
+    "frontend/singlePageApp/hooks/useMotionKitCompletionNotifications.vitest.ts",
+    "frontend/onboarding/components/FancyTooltip/FancyTooltip.vitest.tsx",
+    "frontend/singlePageApp/components/DropdownColorPicker/DropdownColorPicker.vitest.tsx",
+    "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx"
+  ]
 }
