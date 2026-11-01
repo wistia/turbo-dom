@@ -1,0 +1,141 @@
+{
+  "date": "2026-11-01",
+  "tested_fork_commit": "4812f91459e85aba2addaa99abc5e6bb0d58c44b",
+  "wistia_commit": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+  "selection": "wistia-wave3-selection.json",
+  "versions": {
+    "node": "24.19.0",
+    "vitest": "5.0.4",
+    "wistia_jsdom": "30.1.3",
+    "fork_package": "0.5.8",
+    "direct_probe_jsdom": "29.1.1"
+  },
+  "methodology": [
+    "200 previously unrecorded files selected across 149 feature buckets; 127 JSX/TSX files. Prior audit/validation paths, including recorded attempts, excluded. Unrecorded historical attempts cannot be ruled out.",
+    "Sequential jsdom then fork runs; 4 workers each;CI=1,TZ=UTC,NODE_ENV=test. Temporary environment configuration only; no application test/source changes.",
+    "One timed run per condition, fixed order, no excluded warmup. Wall time includes runner setup and report generation; filesystem/transform warming may favor the second condition.",
+    "The four failing files were rerun separately under each condition with 1 worker. All four reproduced only under the fork.",
+    "Source was not modified to fix failures during this audit."
+  ],
+  "results": {
+    "jsdom": {
+      "files": 200,
+      "file_states": {
+        "passed": 198,
+        "skipped": 2
+      },
+      "passed_tests": 1655,
+      "failed_tests": 0,
+      "skipped_tests": 10,
+      "todo_tests": 11,
+      "total_tests": 1676,
+      "wall_seconds": 278.7565408027731
+    },
+    "fork": {
+      "files": 200,
+      "file_states": {
+        "passed": 194,
+        "failed": 4,
+        "skipped": 2
+      },
+      "passed_tests": 1651,
+      "failed_tests": 4,
+      "skipped_tests": 10,
+      "todo_tests": 11,
+      "total_tests": 1676,
+      "wall_seconds": 243.44020372303203
+    }
+  },
+  "identical_test_case_inventory": true,
+  "case_inventory_sha256": "d0016a38da668c64cba7706dd9fb50d7095a862a5b15d70ff409965267546e28",
+  "fork_only_failed_files": 4,
+  "fork_only_failed_tests": 4,
+  "findings": [
+    {
+      "file": "frontend/components/RevampedSearch/SearchFeedbackModal.vitest.tsx",
+      "issue": "Controlled checkbox selection lost",
+      "evidence": "Submitting after clicking the first option produces selectedOptions:[] instead of the selected key. Simple native label/checkbox activation matches jsdom; the controlled UI event path still needs root-cause diagnosis.",
+      "baseline_status": "passed",
+      "fork_status": "failed",
+      "isolated_baseline_status": "passed",
+      "isolated_fork_status": "failed",
+      "failed_tests": [
+        {
+          "name": "SearchFeedbackModal > should submit feedback with selected checkboxes and comments",
+          "messages": [
+            "expected \"vi.fn()\" to be called with arguments: [ { \u2026(2) } ]\n\nReceived:\n\n  1st vi.fn() call:\n\n  [\n    {\n      \"comments\": \"Test feedback comment\",\n-     \"selectedOptions\": [\n-       \"more-relevant-results\",\n-     ],\n+     \"selectedOptions\": [],\n    },\n  ]\n\n\nNumber of calls: 1\n"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "frontend/components/SpeakerManagement/CreateSpeakerModal.vitest.tsx",
+      "issue": "External form reset activation",
+      "evidence": "The Cancel button is type=reset with form=ID outside the form. Fork button.form is null and click dispatches no reset; jsdom associates the form and dispatches reset.",
+      "baseline_status": "passed",
+      "fork_status": "failed",
+      "isolated_baseline_status": "passed",
+      "isolated_fork_status": "failed",
+      "failed_tests": [
+        {
+          "name": "CreateSpeakerModal > when the \"Cancel\" button is clicked > calls the onClose function",
+          "messages": [
+            "expected \"vi.fn()\" to be called with arguments: []\n\nNumber of calls: 0\n"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "frontend/patternHarness/PatternHarnessApp.vitest.tsx",
+      "issue": "Missing HTMLMediaElement ready-state constants",
+      "evidence": "HAVE_CURRENT_DATA and HAVE_ENOUGH_DATA are undefined in the fork, versus 2 and 4 in jsdom. The test uses those constants in its readiness mock and seek polling predicate.",
+      "baseline_status": "passed",
+      "fork_status": "failed",
+      "isolated_baseline_status": "passed",
+      "isolated_fork_status": "failed",
+      "failed_tests": [
+        {
+          "name": "PatternHarnessApp > resolves seekTo only once the footage has finished seeking, not on paint alone",
+          "messages": [
+            "Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\"."
+          ]
+        }
+      ]
+    },
+    {
+      "file": "frontend/components/GradientInput/components/GradientColorPercentageSliderInput.vitest.tsx",
+      "issue": "Gradient background shorthand resolution",
+      "evidence": "background:linear-gradient(...) does not populate computed backgroundImage in the fork; jsdom returns the gradient.",
+      "baseline_status": "passed",
+      "fork_status": "failed",
+      "isolated_baseline_status": "passed",
+      "isolated_fork_status": "failed",
+      "failed_tests": [
+        {
+          "name": "GradientColorPercentageSliderInput > renders with the correct gradient background",
+          "messages": [
+            "expect(element).toHaveStyle()\n\n- Expected\n\n- backgroundImage: linear-gradient(90deg, #FF0000 0%, #00FF00 50%, #0000FF 100%);"
+          ]
+        }
+      ]
+    }
+  ],
+  "isolated_recheck": {
+    "jsdom": {
+      "files": 4,
+      "passed_tests": 13,
+      "failed_tests": 0
+    },
+    "fork": {
+      "files": 4,
+      "passed_tests": 9,
+      "failed_tests": 4
+    }
+  },
+  "performance_note": "Fork elapsed time was lower, but its run has 4 failures. These are raw single-pass compatibility-run timings, not a matched-success benchmark or whole-suite speed estimate.",
+  "remaining_scope": "This sample extends coverage; it does not resolve the four failures or establish full jsdom replacement readiness.",
+  "reproduction": {
+    "selection": "docs/wistia-wave3-selection.json",
+    "command": "ASDF_NODEJS_VERSION=24.19.0 node bench/wistia-compatibility.mjs --wistia PATH --files docs/wistia-wave3-selection.json --output OUTPUT --workers 4 --only jsdom; repeat with --only fork after jsdom exits."
+  }
+}

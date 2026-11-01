@@ -146,6 +146,10 @@ transfers and iframe lifetimes, and CSS priority/custom-property inheritance. Th
 [remaining-gaps validation](docs/wistia-remaining-gaps-validation.json) records
 38 new regression tests, the repeated 257-file check, and the browser features still unsupported.
 
+A [third compatibility sample](docs/wistia-wave3-compatibility.json) covers 200
+additional files: jsdom passes 1,655 tests; the fork passes 1,651 and reproduces four
+new failures in isolation. Those failures remain open.
+
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
 | html5lib-tests conformance | **99.72%** | 37.35% | 97.03% |
