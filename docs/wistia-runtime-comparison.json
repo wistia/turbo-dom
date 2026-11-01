@@ -1,0 +1,305 @@
+{
+  "date": "2026-11-01T00:20:54.176Z",
+  "node": "v24.19.0",
+  "platform": "linux",
+  "arch": "arm64",
+  "logical_cpus": 8,
+  "workers": 4,
+  "repetitions": 3,
+  "expected_tests": 207,
+  "commits": {
+    "wistia": "62f7a9bdab37ad743bd0944c43c73c82d43eb4b5",
+    "baseline": "a49793a0131e58d19d5deb78b9c9185574577581",
+    "fork": "ddee3c7ed7cfcf46edabe0cb1b0c979bc59ec1ac"
+  },
+  "versions": {
+    "jsdom": "30.1.3",
+    "turbo_dom_base": "0.5.8",
+    "turbo_dom_fixed": "0.5.8",
+    "vitest": "5.0.4"
+  },
+  "methodology": [
+    "Same 24-file, 207-test selection that passed both environments in the original evaluation.",
+    "One excluded warmup per condition; sequential timed runs with rotating order.",
+    "Wall time includes Yarn/Vitest process startup, setup, imports, tests and teardown.",
+    "Phase times are summed across workers and must not be added to or compared directly with wall time.",
+    "Dependency installation and GraphQL generation excluded; CI=1 uses already generated GraphQL outputs.",
+    "The sample was selected for compatibility and is not a whole-suite performance estimate.",
+    "Original and fixed turbo-dom both use the same published 0.5.8 native parser artifact."
+  ],
+  "files": [
+    "frontend/components/Auth/PlanSelectionHeader/PlanSelectionHeader.vitest.tsx",
+    "frontend/components/Footer/WadminFooter/WadminToolbarToggleButton.vitest.tsx",
+    "frontend/components/NotificationTray/TaskJobTrackers.vitest.tsx",
+    "frontend/components/SidePanelRedesign/AccessSection/AccessRow.vitest.tsx",
+    "frontend/components/Timeline/TimelineTrackLayoutManager/utils.vitest.ts",
+    "frontend/components/TranscriptArea/components/ManageMediaLocalizationsModal/NewLocalization/PurchaseDubButton.vitest.tsx",
+    "frontend/pricing/components/Trials/TrialModal/TrialModal.routerless.vitest.tsx",
+    "frontend/singlePageApp/components/IntegrationFieldMapping/FieldMappingLabel.vitest.tsx",
+    "frontend/singlePageApp/components/Search/useOpenSearchMediaFiltering.vitest.tsx",
+    "frontend/singlePageApp/screens/AccountSettings/BrandLibraryScreen/domain/token.vitest.ts",
+    "frontend/singlePageApp/screens/AccountSettings/Integrations/components/ConnectionStatus/index.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/components/RemixHeader/RemixSavedActions.vitest.tsx",
+    "frontend/singlePageApp/screens/Agent/hooks/useChatPanelMode.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useFormatApplySettling.vitest.ts",
+    "frontend/singlePageApp/screens/Agent/hooks/useVibeHandoffReveal.vitest.ts",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/Container/Live/LiveSeriesGrid.vitest.tsx",
+    "frontend/singlePageApp/screens/ContentLibrary/2025redesign/MediaGridItem/MediaGridItem.vitest.tsx",
+    "frontend/singlePageApp/screens/Editor/services/useEditSessionByIdService/writeEditSessionDocument.vitest.ts",
+    "frontend/singlePageApp/screens/LiveSeriesScreen/AudienceRegistration/EventDetailsModal.vitest.tsx",
+    "frontend/singlePageApp/screens/LiveStreamScreen/Broadcast/hooks/useAnalytics.vitest.ts",
+    "frontend/singlePageApp/screens/MediaV3/Settings/MediaPageSettings.vitest.tsx",
+    "frontend/singlePageApp/screens/RecordStage/Shared/RadialCountdown.vitest.jsx",
+    "frontend/singlePageApp/screens/analytics/podcastEpisode/PodcastEpisodeAnalytics.vitest.jsx",
+    "frontend/singlePageApp/utilities/clientSideNavigationMaybe.vitest.ts"
+  ],
+  "summary": {
+    "jsdom": {
+      "median_wall_seconds": 42.783264777999996,
+      "min_wall_seconds": 39.70992535600002,
+      "max_wall_seconds": 44.824906051,
+      "median_summed_worker_phase_ms": {
+        "environmentSetupDuration": 17139.951812,
+        "prepareDuration": 129.72952100000225,
+        "collectDuration": 76199.46329700001,
+        "setupDuration": 5096.246176000008,
+        "duration": 49861.617164999996
+      }
+    },
+    "turbo-dom-base": {
+      "median_wall_seconds": 34.839204583999994,
+      "min_wall_seconds": 33.457718483,
+      "max_wall_seconds": 39.97409103700001,
+      "median_summed_worker_phase_ms": {
+        "environmentSetupDuration": 1660.083413000006,
+        "prepareDuration": 102.23948899999687,
+        "collectDuration": 72489.98611299999,
+        "setupDuration": 4366.005212999983,
+        "duration": 43029.887871
+      }
+    },
+    "turbo-dom-fixed": {
+      "median_wall_seconds": 34.166364671000046,
+      "min_wall_seconds": 32.561634006000006,
+      "max_wall_seconds": 38.22695953200001,
+      "median_summed_worker_phase_ms": {
+        "environmentSetupDuration": 1582.9853360000002,
+        "prepareDuration": 100.97767100000829,
+        "collectDuration": 70864.36536800001,
+        "setupDuration": 4308.841029999992,
+        "duration": 40284.476022
+      }
+    }
+  },
+  "runs": [
+    {
+      "environment": "jsdom",
+      "iteration": 0,
+      "warmup": true,
+      "wall_seconds": 44.953489093,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 14289.960858999992,
+        "prepareDuration": 109.42384900000638,
+        "collectDuration": 93444.33071500002,
+        "setupDuration": 4503.826832999997,
+        "duration": 48406.143054
+      }
+    },
+    {
+      "environment": "turbo-dom-base",
+      "iteration": 0,
+      "warmup": true,
+      "wall_seconds": 33.277904084999996,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 2046.0369350000049,
+        "prepareDuration": 101.48411900000042,
+        "collectDuration": 70386.18185000001,
+        "setupDuration": 4353.8552159999945,
+        "duration": 39572.83912899999
+      }
+    },
+    {
+      "environment": "turbo-dom-fixed",
+      "iteration": 0,
+      "warmup": true,
+      "wall_seconds": 34.97438053000001,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 2007.4499309999972,
+        "prepareDuration": 103.0336289999982,
+        "collectDuration": 71907.089982,
+        "setupDuration": 4492.181206999998,
+        "duration": 41665.75458000001
+      }
+    },
+    {
+      "environment": "jsdom",
+      "iteration": 1,
+      "warmup": false,
+      "wall_seconds": 42.783264777999996,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 17968.68396999999,
+        "prepareDuration": 129.72952100000225,
+        "collectDuration": 76199.46329700001,
+        "setupDuration": 5554.867149000011,
+        "duration": 49861.617164999996
+      }
+    },
+    {
+      "environment": "turbo-dom-base",
+      "iteration": 1,
+      "warmup": false,
+      "wall_seconds": 34.839204583999994,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 1601.1322209999967,
+        "prepareDuration": 100.1269419999885,
+        "collectDuration": 72489.98611299999,
+        "setupDuration": 4366.005212999983,
+        "duration": 43029.887871
+      }
+    },
+    {
+      "environment": "turbo-dom-fixed",
+      "iteration": 1,
+      "warmup": false,
+      "wall_seconds": 38.22695953200001,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 2117.540295999998,
+        "prepareDuration": 145.8807960000138,
+        "collectDuration": 79350.05239700002,
+        "setupDuration": 5618.209936999991,
+        "duration": 46102.670356
+      }
+    },
+    {
+      "environment": "turbo-dom-base",
+      "iteration": 2,
+      "warmup": false,
+      "wall_seconds": 33.457718483,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 1660.083413000006,
+        "prepareDuration": 102.23948899999687,
+        "collectDuration": 69732.956938,
+        "setupDuration": 4330.009807000004,
+        "duration": 39527.01106599999
+      }
+    },
+    {
+      "environment": "turbo-dom-fixed",
+      "iteration": 2,
+      "warmup": false,
+      "wall_seconds": 34.166364671000046,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 1582.9853360000002,
+        "prepareDuration": 100.97767100000829,
+        "collectDuration": 70864.36536800001,
+        "setupDuration": 4308.841029999992,
+        "duration": 40284.476022
+      }
+    },
+    {
+      "environment": "jsdom",
+      "iteration": 2,
+      "warmup": false,
+      "wall_seconds": 39.70992535600002,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 14415.686642,
+        "prepareDuration": 109.82710700000302,
+        "collectDuration": 73053.68272400001,
+        "setupDuration": 4282.69939499999,
+        "duration": 47222.08406600001
+      }
+    },
+    {
+      "environment": "turbo-dom-fixed",
+      "iteration": 3,
+      "warmup": false,
+      "wall_seconds": 32.561634006000006,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 1538.95629999998,
+        "prepareDuration": 98.42315500000518,
+        "collectDuration": 70443.18817800001,
+        "setupDuration": 4251.23393700001,
+        "duration": 40020.014263000005
+      }
+    },
+    {
+      "environment": "jsdom",
+      "iteration": 3,
+      "warmup": false,
+      "wall_seconds": 44.824906051,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 17139.951812,
+        "prepareDuration": 145.04233199997952,
+        "collectDuration": 79428.37644900003,
+        "setupDuration": 5096.246176000008,
+        "duration": 56012.973309999994
+      }
+    },
+    {
+      "environment": "turbo-dom-base",
+      "iteration": 3,
+      "warmup": false,
+      "wall_seconds": 39.97409103700001,
+      "exit_code": 0,
+      "files": 24,
+      "passed_tests": 207,
+      "failed_tests": 0,
+      "summed_worker_phase_ms": {
+        "environmentSetupDuration": 2391.160520000006,
+        "prepareDuration": 159.8216650000022,
+        "collectDuration": 84475.45117800002,
+        "setupDuration": 6720.299182999994,
+        "duration": 45440.539800999984
+      }
+    }
+  ],
+  "comparisons": {
+    "fixed_wall_time_reduction_percent_vs_jsdom": 20.14081943421703,
+    "fixed_wall_time_reduction_percent_vs_base": 1.9312723152954847,
+    "base_and_fixed_ranges_overlap": true
+  }
+}
