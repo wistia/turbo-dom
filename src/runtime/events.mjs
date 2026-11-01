@@ -20,7 +20,7 @@ export class Event {
     this.target = null;
     this.currentTarget = null;
     this.eventPhase = PHASE_NONE;
-    this.defaultPrevented = false;
+    this._defaultPrevented = false;
     this.isTrusted = false;
     this.timeStamp = 0;
     this._stopPropagation = false;
@@ -36,7 +36,8 @@ export class Event {
 
   stopPropagation() { this._stopPropagation = true; }
   stopImmediatePropagation() { this._stopPropagation = true; this._stopImmediate = true; }
-  preventDefault() { if (this.cancelable && !this._passiveListener) this.defaultPrevented = true; }
+  get defaultPrevented() { return this._defaultPrevented; }
+  preventDefault() { if (this.cancelable && !this._passiveListener) this._defaultPrevented = true; }
   get returnValue() { return !this.defaultPrevented; }
   set returnValue(v) { if (v === false) this.preventDefault(); }
 
@@ -58,6 +59,17 @@ export class CustomEvent extends Event {
   initCustomEvent(type, bubbles = false, cancelable = false, detail = null) {
     this.initEvent(type, bubbles, cancelable);
     this.detail = detail;
+  }
+}
+
+export class MessageEvent extends Event {
+  constructor(type, init = {}) {
+    super(type, init);
+    this.data = init.data ?? null;
+    this.origin = init.origin ?? '';
+    this.lastEventId = init.lastEventId ?? '';
+    this.source = init.source ?? null;
+    this.ports = init.ports ?? [];
   }
 }
 
@@ -327,6 +339,7 @@ const ON_EVENTS = [
   'pointerenter', 'pointerleave', 'pointercancel', 'touchstart', 'touchend',
   'touchmove', 'animationstart', 'animationend', 'transitionend', 'paste', 'copy',
   'cut', 'drop', 'dragstart', 'dragover', 'dragend', 'select', 'invalid', 'beforeinput',
+  'play', 'pause', 'emptied', 'volumechange',
 ];
 for (const type of ON_EVENTS) {
   const slot = '__on_' + type;

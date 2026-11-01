@@ -14,11 +14,11 @@ import { makeGetComputedStyle } from './cascade.mjs';
 import { CSSStyleSheet } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
 import {
-  Node, Element, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
+  Node, Element, CanvasElement, MediaElement, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
   MutationObserver, DOMParser, XMLSerializer, ShadowRoot,
 } from './dom.mjs';
 import {
-  EventTarget,
+  EventTarget, MessageEvent,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,
   CompositionEvent, WheelEvent, TouchEvent, DragEvent, ProgressEvent,
 } from './events.mjs';
@@ -38,7 +38,101 @@ class ClipboardEvent extends Event {
 // entries into anonymous Blobs (losing the File reference + filename); tests that
 // assert `fd.get('file') === file` need the original kept.
 class TurboFormData {
-  constructor() { this.__entries = []; }
+  constructor(form, submitter = null) {
+    this.__entries = [];
+    if (form !== undefined && (!(form instanceof Element) || form.localName !== 'form' || form.namespaceURI !== 'http://www.w3.org/1999/xhtml')) {
+      throw new TypeError('FormData requires an HTML form element');
+    }
+    if (submitter !== null && (!(submitter instanceof Element) || submitter.namespaceURI !== 'http://www.w3.org/1999/xhtml')) throw new TypeError('FormData submitter must be an HTML element');
+    if (form === undefined) return;
+    if (submitter !== null) {
+      if (!this.__isSubmitButton(submitter)) throw new TypeError('FormData submitter must be a submit button');
+      if (this.__formOwner(submitter) !== form) {
+        const message = 'FormData submitter does not belong to this form';
+        throw globalThis.DOMException
+          ? new globalThis.DOMException(message, 'NotFoundError')
+          : Object.assign(new Error(message), { name: 'NotFoundError' });
+      }
+    }
+    const root = form.getRootNode();
+    for (const control of root.querySelectorAll('input,select,textarea,button')) {
+      if (control.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue;
+      if (this.__formOwner(control) !== form || this.__excluded(control)) continue;
+      const tag = control.localName;
+      const type = String(control.type || '').toLowerCase();
+      const name = control.getAttribute('name') || '';
+      if (tag === 'input' && type === 'image') {
+        if (control === submitter) {
+          this.append(name ? name + '.x' : 'x', '0');
+          this.append(name ? name + '.y' : 'y', '0');
+        }
+        continue;
+      }
+      if (!name) continue;
+      if (tag === 'button' || (tag === 'input' && (type === 'submit' || type === 'button' || type === 'reset'))) {
+        if (control === submitter) this.append(name, control.value ?? control.__value ?? control.getAttribute('value') ?? '');
+        continue;
+      }
+      if (tag === 'input' && (type === 'checkbox' || type === 'radio')) {
+        if (control.checked) this.append(name, !control.hasAttribute('value') && control.__value === undefined ? 'on' : control.value);
+      } else if (tag === 'input' && type === 'file') {
+        const files = control.files;
+        if (files && files.length) {
+          for (let i = 0; i < files.length; i++) this.append(name, files[i]);
+        } else {
+          this.append(name, new TURBO_FILE([], '', { type: 'application/octet-stream' }));
+        }
+      } else if (tag === 'select') {
+        const options = Array.from(control.options);
+        let selected = options.filter(option => option.selected);
+        if (!control.multiple) {
+          if (selected.length) selected = selected.slice(-1);
+          else if (!(Number(control.getAttribute('size')) > 1) && !options.some(option => option.__selected !== undefined)) {
+            const first = options.find(option => !this.__optionDisabled(option));
+            if (first) selected = [first];
+          }
+        }
+        for (const option of selected) if (!this.__optionDisabled(option)) this.append(name, option.value);
+      } else {
+        this.append(name, control.value ?? '');
+      }
+    }
+  }
+  __isSubmitButton(control) {
+    const type = String(control.type || '').toLowerCase();
+    return control.localName === 'input' ? type === 'submit' || type === 'image'
+      : control.localName === 'button' && type !== 'button' && type !== 'reset';
+  }
+  __formOwner(control) {
+    const id = control.getAttribute('form');
+    if (id !== null) {
+      if (!id) return null;
+      const root = control.getRootNode();
+      let candidate = root.nodeType === 1 && root.id === id ? root : null;
+      if (!candidate && root.getElementById) candidate = root.getElementById(id);
+      else if (!candidate) {
+        for (const element of root.querySelectorAll('[id]')) {
+          if (element.id === id) { candidate = element; break; }
+        }
+      }
+      return candidate && candidate.localName === 'form' ? candidate : null;
+    }
+    return control.closest('form');
+  }
+  __excluded(control) {
+    if (control.disabled) return true;
+    for (let parent = control.parentElement; parent; parent = parent.parentElement) {
+      if (parent.localName === 'datalist') return true;
+      if (parent.localName !== 'fieldset' || !parent.disabled) continue;
+      let legend = null;
+      for (const child of parent.children) if (child.localName === 'legend') { legend = child; break; }
+      if (!legend || !legend.contains(control)) return true;
+    }
+    return false;
+  }
+  __optionDisabled(option) {
+    return option.disabled || (option.parentElement && option.parentElement.localName === 'optgroup' && option.parentElement.disabled);
+  }
   append(name, value, filename) { this.__entries.push([String(name), this.__wrap(value, filename)]); }
   set(name, value, filename) { this.delete(name); this.append(name, value, filename); }
   __wrap(value, filename) {
@@ -64,13 +158,13 @@ class TurboFormData {
 // `el instanceof HTMLXElement` is true only for elements with the matching
 // localName (matcher = string or RegExp). Avoids aliasing every interface to
 // Element (which made `instanceof HTMLAnchorElement` true for ALL elements).
-function tagClass(matcher) {
+function tagClass(matcher, prototype = Element.prototype) {
   const test = typeof matcher === 'string' ? (n) => n === matcher : (n) => matcher.test(n);
   const C = function () { throw new TypeError('Illegal constructor'); };
-  // share Element.prototype so prototype-level spies/reads resolve (e.g.
+  // Share the runtime interface prototype so prototype-level spies/reads resolve (e.g.
   // vi.spyOn(HTMLAnchorElement.prototype, 'click')); instanceof is decided by
   // the tag matcher below, not the prototype chain.
-  C.prototype = Element.prototype;
+  C.prototype = prototype;
   Object.defineProperty(C, Symbol.hasInstance, {
     value: (o) => o != null && o.nodeType === 1 && test(o.localName),
   });
@@ -158,9 +252,20 @@ const hostClearInterval = globalThis.clearInterval;
 const hostQueueMicrotask = globalThis.queueMicrotask;
 const hostStructuredClone = globalThis.structuredClone;
 
-export function createWindow(document, { url = 'http://localhost/' } = {}) {
+export function createWindow(document, { url = 'http://localhost/', parentWindow = null, topWindow = null, frameElement = null, inheritedOrigin, isAncestorActive = null } = {}) {
   const touched = new Set();
   let windowProxy;
+  let messageHandler = null;
+  let messageErrorHandler = null;
+  let generation = 0;
+  const frames = new WeakMap();
+  const receiver = () => document.defaultView || windowProxy;
+  const setHandler = (type, previous, next) => {
+    if (previous) EventTarget.prototype.removeEventListener.call(receiver(), type, previous);
+    const handler = typeof next === 'function' ? next : null;
+    if (handler) EventTarget.prototype.addEventListener.call(receiver(), type, handler);
+    return handler;
+  };
 
   // Per-env globals: only the ~11 that capture document/url/windowProxy. Everything
   // stateless (constructors, timers, stateless window methods) lives in the shared
@@ -169,6 +274,8 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
   // `window.x = y` assignment writes to base, shadowing STATIC_BASE per-env.
   const base = {
     document,
+    __listeners: null,
+    frameElement,
     // Snapshot before installGlobals or an interceptor replaces globalThis.fetch.
     fetch: globalThis.fetch ? globalThis.fetch.bind(globalThis) : undefined,
     name: '',
@@ -178,17 +285,58 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
     // customElements is lazy (SHARED_LAZY) — env-independent + rarely used; building
     // its two Maps eagerly per createWindow was wasted for the typical test.
     Image: function Image(w, h) { const img = document.createElement('img'); if (w != null) img.setAttribute('width', w); if (h != null) img.setAttribute('height', h); return img; },
-    Audio: function Audio(src) { const a = document.createElement('audio'); if (src) a.setAttribute('src', src); return a; },
     getSelection: () => document.getSelection(),
-    dispatchEvent: (e) => document.dispatchEvent(e),
-    addEventListener: (...a) => document.addEventListener(...a),
-    removeEventListener: (...a) => document.removeEventListener(...a),
+    dispatchEvent: (e) => EventTarget.prototype.dispatchEvent.call(receiver(), e),
+    addEventListener: (...a) => EventTarget.prototype.addEventListener.call(receiver(), ...a),
+    removeEventListener: (...a) => EventTarget.prototype.removeEventListener.call(receiver(), ...a),
+    get onmessage() { return messageHandler; },
+    set onmessage(value) { messageHandler = setHandler('message', messageHandler, value); },
+    get onmessageerror() { return messageErrorHandler; },
+    set onmessageerror(value) { messageErrorHandler = setHandler('messageerror', messageErrorHandler, value); },
+    postMessage(message, targetOrigin = '/', transfer = []) {
+      if (typeof targetOrigin === 'object' && targetOrigin !== null) {
+        transfer = targetOrigin.transfer ?? [];
+        targetOrigin = targetOrigin.targetOrigin ?? '/';
+      }
+      const target = receiver();
+      const source = globalThis.window || target;
+      const origin = source.origin || source.location?.origin || 'null';
+      let allowedOrigin = String(targetOrigin);
+      if (allowedOrigin === '/') allowedOrigin = origin;
+      else if (allowedOrigin !== '*') {
+        try { allowedOrigin = new URL(allowedOrigin).origin; }
+        catch { throw new SyntaxError('Invalid target origin'); }
+      }
+      if (typeof hostStructuredClone !== 'function') throw new Error('postMessage requires host structuredClone');
+      const data = hostStructuredClone(message, { transfer });
+      const sentGeneration = generation;
+      (globalThis.setTimeout || hostSetTimeout)(() => {
+        if (sentGeneration !== generation || target.document !== document || (isAncestorActive && !isAncestorActive())
+          || (allowedOrigin !== '*' && allowedOrigin !== windowProxy.origin)) return;
+        const event = new MessageEvent('message', { data, origin, source });
+        event.data = data;
+        base.dispatchEvent(event);
+      }, 0);
+    },
   };
 
   // Per-env lazy globals: ONLY those that capture document/url/windowProxy.
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    Audio: () => {
+      function Audio(src) {
+        const audio = document.createElement('audio');
+        audio.preload = 'auto';
+        if (src !== undefined) audio.setAttribute('src', src);
+        return audio;
+      }
+      Audio.prototype = MediaElement.prototype;
+      Object.defineProperty(Audio, Symbol.hasInstance, {
+        value: (element) => element instanceof STATIC_BASE.HTMLAudioElement,
+      });
+      return Audio;
+    },
     Option: () => {
       function Option(text = '', value, defaultSelected = false, selected = false) {
         const option = document.createElement('option');
@@ -204,7 +352,7 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
       });
       return Option;
     },
-    origin: () => new URL(url).origin,
+    origin: () => inheritedOrigin ?? new URL(url).origin,
     // subsystem grouping: history co-materializes with (and shares) location
     location: () => makeLocation(url),
     history: () => makeHistory(windowProxy.location),
@@ -214,7 +362,9 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
 
   windowProxy = new Proxy(base, {
     get(t, k) {
-      if (k === 'window' || k === 'self' || k === 'globalThis' || k === 'parent' || k === 'top') return windowProxy;
+      if (k === 'parent') return parentWindow || windowProxy;
+      if (k === 'top') return topWindow || parentWindow || windowProxy;
+      if (k === 'window' || k === 'self' || k === 'globalThis' || k === 'frames') return windowProxy;
       if (k in t) return t[k];            // per-env (incl. overrides + materialized lazy)
       if (k in STATIC_BASE) return STATIC_BASE[k];  // shared stateless globals
       const factory = lazy[k] || SHARED_LAZY[k];
@@ -229,7 +379,7 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
     set(t, k, v) { t[k] = v; return true; },  // writes to base → shadows STATIC_BASE per-env
     has(t, k) {
       return k in t || k in STATIC_BASE || k in lazy || k in SHARED_LAZY ||
-        k === 'window' || k === 'self' || k === 'globalThis' || k === 'parent' || k === 'top';
+        k === 'window' || k === 'self' || k === 'globalThis' || k === 'frames' || k === 'parent' || k === 'top';
     },
     // so vi.spyOn(window, 'scrollTo'/'open'/…) finds STATIC_BASE methods as own
     // props; spyOn then defineProperty's the spy onto base (target), shadowing it.
@@ -242,6 +392,24 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
   });
 
   document.defaultView = windowProxy;
+  document.__frameWindowFor = (frame) => {
+    const html = frame.srcdoc;
+    let child = frames.get(frame);
+    if (!child || child.html !== html) {
+      const parentGeneration = generation;
+      const childDocument = new DOMParser().parseFromString(html, 'text/html');
+      const win = createWindow(childDocument, {
+        url: frame.hasAttribute('srcdoc') ? 'about:srcdoc' : 'about:blank',
+        parentWindow: receiver(), topWindow: receiver().top, frameElement: frame,
+        inheritedOrigin: windowProxy.origin,
+        isAncestorActive: () => parentGeneration === generation && receiver().document === document
+          && frame.isConnected && (!isAncestorActive || isAncestorActive()),
+      });
+      child = { html, window: win.window };
+      frames.set(frame, child);
+    }
+    return child.window;
+  };
 
   return {
     window: windowProxy,
@@ -251,6 +419,10 @@ export function createWindow(document, { url = 'http://localhost/' } = {}) {
     globalKeys: [...Object.keys(base), ...Object.keys(STATIC_BASE), ...Object.keys(lazy), ...Object.keys(SHARED_LAZY)],
     // Layer 5: drop materialized global slots, keep the class machinery warm.
     resetGlobals() {
+      generation++;
+      base.__listeners = null;
+      messageHandler = null;
+      messageErrorHandler = null;
       for (const k of touched) delete base[k];
       touched.clear();
     },
@@ -382,11 +554,11 @@ const STATIC_BASE = {
   // DOM + event constructors (cheap class refs)
   Node, Element, Text, Comment, Document, DocumentFragment, DocumentType, EventTarget, NamedNodeMap,
   ShadowRoot,
-  Event, CustomEvent,
+  Event, CustomEvent, MessageEvent,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,
   CompositionEvent, WheelEvent, TouchEvent, DragEvent, ProgressEvent, ClipboardEvent,
   DataTransfer,
-  // every element is a plain Element → `el instanceof HTMLElement` is true.
+  // HTML interfaces inherit Element → `el instanceof HTMLElement` is true.
   // Tag-specific interfaces match by localName via Symbol.hasInstance.
   HTMLElement: Element, SVGElement,
   // SVG interface globals. Libs (and test setup mocks) do
@@ -409,7 +581,7 @@ const STATIC_BASE = {
   HTMLTextAreaElement: tagClass('textarea'), HTMLSelectElement: tagClass('select'),
   HTMLOptionElement: tagClass('option'), HTMLButtonElement: tagClass('button'),
   HTMLFormElement: tagClass('form'), HTMLImageElement: tagClass('img'),
-  HTMLCanvasElement: tagClass('canvas'), HTMLTemplateElement: tagClass('template'),
+  HTMLCanvasElement: tagClass('canvas', CanvasElement.prototype), HTMLTemplateElement: tagClass('template'),
   HTMLLabelElement: tagClass('label'), HTMLDivElement: tagClass('div'),
   HTMLSpanElement: tagClass('span'), HTMLParagraphElement: tagClass('p'),
   HTMLUListElement: tagClass('ul'), HTMLLIElement: tagClass('li'),
@@ -430,8 +602,8 @@ const STATIC_BASE = {
   HTMLBRElement: tagClass('br'), HTMLHRElement: tagClass('hr'),
   HTMLQuoteElement: tagClass(/^(q|blockquote)$/), HTMLModElement: tagClass(/^(ins|del)$/),
   HTMLPictureElement: tagClass('picture'), HTMLSourceElement: tagClass('source'),
-  HTMLTrackElement: tagClass('track'), HTMLVideoElement: tagClass('video'),
-  HTMLAudioElement: tagClass('audio'), HTMLMediaElement: tagClass(/^(video|audio)$/),
+  HTMLTrackElement: tagClass('track'), HTMLVideoElement: tagClass('video', MediaElement.prototype),
+  HTMLAudioElement: tagClass('audio', MediaElement.prototype), HTMLMediaElement: tagClass(/^(video|audio)$/, MediaElement.prototype),
   HTMLEmbedElement: tagClass('embed'), HTMLObjectElement: tagClass('object'),
   HTMLMapElement: tagClass('map'), HTMLAreaElement: tagClass('area'),
   HTMLScriptElement: tagClass('script'), HTMLStyleElement: tagClass('style'),

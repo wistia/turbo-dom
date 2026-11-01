@@ -9,14 +9,16 @@ import { parseArgs } from 'node:util';
 const { values } = parseArgs({ options: {
   wistia: { type: 'string' }, files: { type: 'string' }, output: { type: 'string' },
   workers: { type: 'string', default: '3' },
+  only: { type: 'string', default: 'both' },
 } });
 if (!values.wistia || !values.files || !values.output) {
-  throw new Error('Usage: node bench/wistia-compatibility.mjs --wistia PATH --files SELECTION.json --output PATH [--workers 3]');
+  throw new Error('Usage: node bench/wistia-compatibility.mjs --wistia PATH --files SELECTION.json --output PATH [--workers 3] [--only both|jsdom|fork]');
 }
 const wistia = resolve(values.wistia);
 const fork = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(values.output);
 const workers = Number(values.workers);
+if (!['both', 'jsdom', 'fork'].includes(values.only)) throw new Error('Only must be both, jsdom, or fork');
 if (!Number.isInteger(workers) || workers < 1) throw new Error('Workers must be a positive integer');
 const selection = JSON.parse(await readFile(resolve(values.files), 'utf8'));
 const files = Array.isArray(selection) ? selection : selection.files;
@@ -82,9 +84,11 @@ async function run(name, environment) {
   return result;
 }
 try {
-  const results = await Promise.allSettled([
-    run('jsdom', 'jsdom'), run('fork', join(fork, 'src/environment/vitest.mjs')),
-  ]);
+  const conditions = [
+    { name: 'jsdom', environment: 'jsdom' },
+    { name: 'fork', environment: join(fork, 'src/environment/vitest.mjs') },
+  ].filter(condition => values.only === 'both' || values.only === condition.name);
+  const results = await Promise.allSettled(conditions.map(condition => run(condition.name, condition.environment)));
   const serialized = results.map(result => result.status === 'fulfilled' ? result : {
     status: result.status, reason: String(result.reason),
   });

@@ -132,7 +132,10 @@ for the file selection, regression tests, and remaining runtime limitations.
 A second sample of 201 additional files found seven fork-only failing files
 (58 tests), plus one file that also fails under jsdom. See the
 [expanded compatibility audit](docs/wistia-wave2-compatibility.json) for the
-reproduced failures and browser API probes.
+reproduced failures and browser API probes. The five requested API groups are now fixed:
+all 58 fork-only failures pass. The combined 257-file sample has 2,201 passing tests,
+one deferred custom-element lifecycle failure, and 18 skipped/todo tests. See the
+[follow-up validation](docs/wistia-wave2-fixes-validation.json) for coverage and limits.
 
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|
@@ -191,12 +194,14 @@ Wistia fork query smoke check on Linux ARM64, Node 24.19.0 (`npm run bench:query
 | Runtime | Iterations per second |
 |---|---:|
 | turbo-dom, before these fixes | 803,430 |
-| turbo-dom, after these fixes | 800,731 |
-| jsdom 29.1.1, same post-fix run | 1,184 |
-| happy-dom 20.14.5, same post-fix run | 239,249 |
+| turbo-dom, after first compatibility fixes | 800,731 |
+| turbo-dom, after second compatibility fixes | 791,718 |
+| jsdom 29.1.1, latest run | 1,177 |
+| happy-dom 20.14.5, latest run | 246,774 |
 
 These are single-run microbenchmark observations, not end-to-end suite timings.
-The [validation record](docs/wistia-six-file-validation.json) includes both runs.
+The [validation record](docs/wistia-six-file-validation.json) includes the initial runs; the [follow-up record](docs/wistia-wave2-fixes-validation.json)
+includes the latest smoke check.
 
 ## How it works
 

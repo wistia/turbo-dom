@@ -16,6 +16,7 @@
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
+import { normalizeZeroLengths } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -25,16 +26,6 @@ const SHORTHAND_OF = {
   'margin-top': 'margin', 'margin-right': 'margin', 'margin-bottom': 'margin', 'margin-left': 'margin',
   'padding-top': 'padding', 'padding-right': 'padding', 'padding-bottom': 'padding', 'padding-left': 'padding',
 };
-
-// Length properties whose bare `0` real browsers serialize as `0px` in computed style.
-const LENGTH_PROPS = new Set([
-  'width', 'height', 'min-width', 'max-width', 'min-height', 'max-height',
-  'top', 'right', 'bottom', 'left', 'flex-basis', 'gap', 'row-gap', 'column-gap',
-  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'border-width', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-  'font-size', 'letter-spacing', 'word-spacing', 'text-indent',
-]);
 
 const BORDER_STYLES = new Set(['none', 'hidden', 'dotted', 'dashed', 'solid', 'double', 'groove', 'ridge', 'inset', 'outset']);
 
@@ -203,8 +194,7 @@ function lookup(map, prop) {
     if (sh) { const s = map.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
   }
   if (v === undefined) return '';
-  // px-normalize a bare `0` for length properties (browsers report `0px`)
-  if (v === '0' && LENGTH_PROPS.has(prop)) return '0px';
+  v = normalizeZeroLengths(prop, v);
   // font-family: browsers serialize the list with ", " regardless of source spacing
   // (emotion minifies to "a",b,c). Scoped to font-family so we don't rewrite commas
   // inside rgb()/cubic-bezier() values, which browsers leave compact.

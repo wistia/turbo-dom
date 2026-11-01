@@ -107,7 +107,14 @@ package or publish workflow.
   coerces numerically), `viewBox`→`SVGAnimatedRect`, plus honest `getBBox`/`getCTM` stubs.
   Wrappers are built lazily on access (live over the attribute, no snapshot). `newElement()`
   picks the subclass by ns at every construction site (inflate/innerHTML/cloneNode/createElementNS)
-  — HTML elements stay plain `Element` (no SVG getters, no regression, no hot-path cost).
+  — ordinary HTML elements stay plain `Element` (no SVG getters).
+- **Canvas and media have scoped HTML subclasses** (`dom.mjs` `CanvasElement`/`MediaElement`),
+  selected by `newElement()` for every creation path. Canvas width/height reflect numeric
+  attributes with 300×150 defaults. Audio/video controls are virtual: `play()` resolves a
+  control-state transition and `pause()`/`load()` update state, without decoding, fetching,
+  or advancing playback time. `readyState`/`networkState` remain empty, `duration` is `NaN`,
+  and `canPlayType()` returns `''`. The scoped prototypes support interface spies without
+  exposing canvas dimensions or media controls on ordinary HTML elements.
 - **CSSOM is minimal + test-time only** (`cssom.mjs`): `<style>.sheet` (lazy `__sheet`, only
   emotion-touched styles allocate one) + live `document.styleSheets` + `insertRule`/`deleteRule`.
   `insertRule` bumps `Document.__version` (via owner `__touch()`), and `cascade.mjs` reads
@@ -229,9 +236,9 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
 - `getByLabelText` was O(n²) (element.labels → getElementsByTagName('label') per element);
   the caches took it 1342→~270µs.
 Numbers in README.md — refresh both (bench against jsdom AND happy-dom) if you touch hot paths.
-The Wistia fork's Linux ARM64 query smoke snapshot is 800,731 iters/sec versus jsdom
-29.1.1 at 1,184 and happy-dom 20.14.5 at 239,249 (Node 24.19.0, single run).
-See `docs/wistia-six-file-validation.json` for the before/after observations and scope.
+The Wistia fork's Linux ARM64 query smoke snapshot is 791,718 iters/sec versus jsdom
+29.1.1 at 1,177 and happy-dom 20.14.5 at 246,774 (Node 24.19.0, single run).
+See `docs/wistia-wave2-fixes-validation.json` for current observations and scope.
 - **Parse memoization (index.mjs `parseBufferCached`).** The SoA buffer is READ-ONLY — every
   mutation goes to a Document's own `__kids`/`__attrs`/`__cache` overlay, never the buffer — so
   the same buffer backs many Documents. Suites call setup with the same shell HTML per file →

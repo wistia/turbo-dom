@@ -45,7 +45,10 @@ export function installGlobals(target, { html = DEFAULT_HTML, url } = {}) {
     define(name, {
       configurable: true,
       get: () => window[name],
-      set(v) { Object.defineProperty(target, name, { configurable: true, writable: true, value: v }); },
+      set(v) {
+        if (name === '__listeners' || name === 'onmessage' || name === 'onmessageerror') window[name] = v;
+        else Object.defineProperty(target, name, { configurable: true, writable: true, value: v });
+      },
     });
   }
 

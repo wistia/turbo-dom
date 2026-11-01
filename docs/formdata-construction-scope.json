@@ -1,0 +1,22 @@
+{
+  "scope": "FormData(form[, submitter]) serialization of standard HTML input, button, select and textarea controls",
+  "implemented": [
+    "Named successful controls in tree order, including duplicate names and explicit form ownership",
+    "Disabled controls, disabled fieldsets with the first-legend exception, and datalist exclusions",
+    "Checked checkbox/radio values, selected options, disabled optgroups, textarea values and file inputs",
+    "Submitter validation, named submit buttons and zero-coordinate image submitters",
+    "Existing File and Blob identity preservation through append, set and form file serialization"
+  ],
+  "remaining_scope": [
+    "No form-associated custom-element lifecycle or ElementInternals support is added",
+    "No formdata event dispatch, object/plugin controls or dirname directionality entries are added",
+    "File serialization consumes an existing files collection; this does not add FileList or upload-control lifecycle machinery",
+    "Single-select fallback covers ordinary parsed controls and existing explicit selection state; full implicit selectedness updates after later option insertion/removal remain part of the existing DOM-control implementation"
+  ],
+  "validation": {
+    "regression_file": "test/formdata-construction.test.mjs",
+    "regressions_passed": 17,
+    "wistia_file": "frontend/singlePageApp/screens/ChannelPodcastSettingsScreen/components/sections/Feed/sections/Categorization.vitest.tsx",
+    "wistia_tests_passed": 3
+  }
+}

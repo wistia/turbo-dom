@@ -16,6 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
+import { normalizeZeroLengths } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -416,7 +417,7 @@ export class Element extends Node {
     this.__ns = namespace;            // '', 'svg', 'math'
     this.__attrs = undefined;         // lazily built (buffer or []) on first attr touch
     this.__attrIdx = -1;              // buffer index for lazy attr inflation
-    this.content = null;              // <template> content fragment
+    this.content = localName === 'template' && !namespace ? new DocumentFragment(ownerDocument) : null;
     this.shadowRoot = null;           // open shadow root, if attached
     // Predeclare the hot lazy fields (left at their "absent" sentinel) so every
     // Element shares ONE hidden class. Without this, fields added on demand in
@@ -657,6 +658,13 @@ export class Element extends Node {
   set referrerPolicy(x) { this.setAttribute('referrerpolicy', x); }
   get src() { return this.getAttribute('src') ?? ''; }
   set src(x) { this.setAttribute('src', x); }
+  get srcdoc() { return this.getAttribute('srcdoc') ?? ''; }
+  set srcdoc(value) { this.setAttribute('srcdoc', String(value)); }
+  get contentWindow() {
+    if (this.localName !== 'iframe' || !this.isConnected) return null;
+    return this.ownerDocument.__frameWindowFor?.(this) ?? null;
+  }
+  get contentDocument() { return this.contentWindow?.document ?? null; }
   get alt() { return this.getAttribute('alt') ?? ''; }
   set alt(x) { this.setAttribute('alt', x); }
 
@@ -757,14 +765,15 @@ export class Element extends Node {
   get innerHTML() { return serializeInner(this); }
   set innerHTML(html) {
     const frag = getParser().parseFragment(String(html), this.__ns ? `${this.__ns} ${this.localName}` : this.localName);
-    this.__detachKids();
-    this.__kids = [];
-    this.__touch();
+    const target = this.content || this;
+    target.__detachKids();
+    target.__kids = [];
+    target.__touch();
     for (const rawChild of frag.children) {
       if (rawChild.nodeType === DOCUMENT_FRAGMENT_NODE && rawChild.name === 'content') continue;
       const child = this.ownerDocument.__inflateNested(rawChild);
-      child.parentNode = this;
-      this.__kids.push(child);
+      child.parentNode = target;
+      target.__kids.push(child);
     }
   }
   get outerHTML() { return serializeOuter(this); }
@@ -789,6 +798,7 @@ export class Element extends Node {
     const el = newElement(this.ownerDocument, this.localName, this.__ns);
     el.__attrs = (this.__attrs ?? (this.__attrs = this.__buildAttrs())).map((a) => ({ ...a }));
     if (deep) {
+      if (this.content) el.content = this.content.cloneNode(true);
       // build the cloned child array directly — the clone is detached, so per-child
       // appendChild's notifyMutation (version bump) + reparent check are pure waste.
       const src = this.__children(), od = el.ownerDocument, kids = el.__kids = new Array(src.length);
@@ -1010,6 +1020,79 @@ export class Element extends Node {
 }
 
 
+function canvasDimension(element, name, fallback) {
+  const match = /^[\t\n\f\r ]*\+?(\d+)/.exec(element.getAttribute(name) || '');
+  const dimension = match ? Number(match[1]) : NaN;
+  return dimension <= 0x7fffffff ? dimension : fallback;
+}
+
+function setCanvasDimension(element, name, value, fallback) {
+  const dimension = +value >>> 0;
+  element.setAttribute(name, dimension <= 0x7fffffff ? dimension : fallback);
+}
+
+export class CanvasElement extends Element {
+  get width() { return canvasDimension(this, 'width', 300); }
+  set width(value) { setCanvasDimension(this, 'width', value, 300); }
+  get height() { return canvasDimension(this, 'height', 150); }
+  set height(value) { setCanvasDimension(this, 'height', value, 150); }
+}
+
+function mediaNumber(value) {
+  const number = +value;
+  if (!Number.isFinite(number)) throw new TypeError('Media values must be finite');
+  return number;
+}
+
+function queueMediaEvent(element, type) {
+  Promise.resolve().then(() => element.dispatchEvent(new Event(type)));
+}
+
+// Virtual controls only: no decoding, resource fetching, or automatic time advancement.
+export class MediaElement extends Element {
+  get paused() { return this.__mediaPaused ?? true; }
+  get ended() { return false; }
+  get readyState() { return 0; }
+  get networkState() { return 0; }
+  get duration() { return NaN; }
+  get currentSrc() { return ''; }
+  get currentTime() { return this.__mediaTime ?? 0; }
+  set currentTime(value) { this.__mediaTime = mediaNumber(value); }
+  get volume() { return this.__mediaVolume ?? 1; }
+  set volume(value) {
+    const volume = mediaNumber(value);
+    if (volume < 0 || volume > 1) {
+      const message = 'Volume must be between 0 and 1';
+      throw globalThis.DOMException ? new globalThis.DOMException(message, 'IndexSizeError')
+        : Object.assign(new Error(message), { name: 'IndexSizeError' });
+    }
+    if (volume !== this.volume) { this.__mediaVolume = volume; queueMediaEvent(this, 'volumechange'); }
+  }
+  get muted() { return this.__mediaMuted ?? false; }
+  set muted(value) {
+    const muted = Boolean(value);
+    if (muted !== this.muted) { this.__mediaMuted = muted; queueMediaEvent(this, 'volumechange'); }
+  }
+  get defaultMuted() { return this.hasAttribute('muted'); }
+  set defaultMuted(value) { if (value) this.setAttribute('muted', ''); else this.removeAttribute('muted'); }
+  get preload() { return this.getAttribute('preload') ?? ''; }
+  set preload(value) { this.setAttribute('preload', value); }
+  play() {
+    if (this.paused) { this.__mediaPaused = false; queueMediaEvent(this, 'play'); }
+    return Promise.resolve();
+  }
+  pause() {
+    if (!this.paused) { this.__mediaPaused = true; queueMediaEvent(this, 'pause'); }
+  }
+  load() {
+    const changed = !this.paused || this.currentTime !== 0;
+    this.__mediaPaused = true;
+    this.__mediaTime = 0;
+    if (changed) queueMediaEvent(this, 'emptied');
+  }
+  canPlayType() { return ''; }
+}
+
 // ------------------------------------------------------------- SVGElement ----
 // SVG elements expose their geometry/identity attributes as SVGAnimated{String,Length,
 // Rect} objects (el.className.baseVal, rect.width.baseVal.value, svg.viewBox.baseVal),
@@ -1043,10 +1126,13 @@ for (const attr of SVG_LENGTH_ATTRS) {
   });
 }
 
-// Element factory: SVG namespace → SVGElement, everything else → Element. One place so
+// Element factory: specialized DOM interfaces, ordinary HTML → Element. One place so
 // every construction site (buffer inflation, innerHTML, cloneNode, createElementNS) agrees.
 function newElement(doc, tag, ns) {
-  return ns === 'svg' ? new SVGElement(doc, tag, ns) : new Element(doc, tag, ns);
+  if (ns === 'svg') return new SVGElement(doc, tag, ns);
+  if (!ns && tag === 'canvas') return new CanvasElement(doc, tag, ns);
+  if (!ns && (tag === 'audio' || tag === 'video')) return new MediaElement(doc, tag, ns);
+  return new Element(doc, tag, ns);
 }
 
 
@@ -1054,6 +1140,9 @@ function newElement(doc, tag, ns) {
 export class DocumentFragment extends Node {
   get nodeType() { return DOCUMENT_FRAGMENT_NODE; }
   get nodeName() { return '#document-fragment'; }
+  get firstElementChild() { for (const child of this.__children()) if (child.nodeType === ELEMENT_NODE) return child; return null; }
+  get lastElementChild() { const kids = this.__children(); for (let i = kids.length - 1; i >= 0; i--) if (kids[i].nodeType === ELEMENT_NODE) return kids[i]; return null; }
+  get childElementCount() { let count = 0; for (const child of this.__children()) if (child.nodeType === ELEMENT_NODE) count++; return count; }
   querySelector(sel) { return cachedQS(this, sel); }
   querySelectorAll(sel) { return cachedQSA(this, sel); }
   get children() { if (this.__childrenList) return this.__childrenList; const self = this; return (this.__childrenList = liveHTMLCollection(() => self.__children().filter((n) => n.nodeType === ELEMENT_NODE))); }
@@ -1412,10 +1501,10 @@ export class XMLSerializer {
 // minimal inline-style CSSOM (honest: only inline + explicitly set props)
 function makeStyle(el) {
   // parse → { values: Map<prop,value>, prio: Map<prop,'important'|''> } (handles !important)
-  const parse = () => {
+  const parse = (text = el.getAttribute('style') || '') => {
     const values = new Map();
     const prio = new Map();
-    for (const decl of (el.getAttribute('style') || '').split(';')) {
+    for (const decl of text.split(';')) {
       const i = decl.indexOf(':');
       if (i === -1) continue;
       const prop = decl.slice(0, i).trim();
@@ -1427,25 +1516,24 @@ function makeStyle(el) {
     }
     return { values, prio };
   };
-  const write = ({ values, prio }) => {
-    el.setAttribute('style', [...values].map(([k, v]) => `${k}: ${v}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; '));
-  };
+  const serialize = ({ values, prio }) => [...values].map(([k, v]) => `${k}: ${normalizeZeroLengths(k, v)}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; ');
+  const write = (style) => el.setAttribute('style', serialize(style));
   return new Proxy({}, {
     get(_t, key) {
       if (key === 'getPropertyValue') return (p) => styleGet(parse().values, p);
       if (key === 'getPropertyPriority') return (p) => parse().prio.get(p) ?? '';
       if (key === 'setProperty') return (p, v, priority) => { const s = parse(); s.values.set(p, String(v)); if (priority) s.prio.set(p, 'important'); else s.prio.delete(p); write(s); };
-      if (key === 'removeProperty') return (p) => { const s = parse(); const v = s.values.get(p) ?? ''; s.values.delete(p); s.prio.delete(p); write(s); return v; };
+      if (key === 'removeProperty') return (p) => { const s = parse(); const v = normalizeZeroLengths(p, s.values.get(p) ?? ''); s.values.delete(p); s.prio.delete(p); write(s); return v; };
       if (key === 'item') return (i) => [...parse().values.keys()][i] ?? '';
       if (key === 'length') return parse().values.size;
-      if (key === 'cssText') return el.getAttribute('style') || '';
+      if (key === 'cssText') return serialize(parse());
       if (key === 'cssFloat') return parse().values.get('float') ?? '';
       if (key === Symbol.iterator) { const keys = [...parse().values.keys()]; return keys[Symbol.iterator].bind(keys); }
       if (typeof key !== 'string') return undefined;
       return styleGet(parse().values, kebab(key));
     },
     set(_t, key, value) {
-      if (key === 'cssText') { el.setAttribute('style', String(value)); return true; }
+      if (key === 'cssText') { write(parse(String(value))); return true; }
       const s = parse(); s.values.set(kebab(key), String(value)); write(s); return true;
     },
     has(_t, key) { return typeof key === 'string'; },
@@ -1470,6 +1558,7 @@ function styleGet(values, prop) {
     if (sh) { const s = values.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
   }
   if (v === undefined) return '';
+  v = normalizeZeroLengths(prop, v);
   // Inline CSSOM canonicalizes <color> values the way a browser does on read-back:
   // hex/rgb()/hsl() → rgb()/rgba(), but NAMED keywords stay as authored (includeNamed
   // =false) — `el.style.color='red'` reads back `'red'`, `'#fff'` reads back rgb().
@@ -1735,7 +1824,7 @@ export class Document extends Node {
   }
 
   // ---- factories (owned nodes, no buffer) ----
-  createElement(tag) { return new Element(this, String(tag).toLowerCase(), ''); }
+  createElement(tag) { return newElement(this, String(tag).toLowerCase(), ''); }
   createElementNS(ns, qualified) {
     const short = ns === SVG_NS ? 'svg' : ns === MATHML_NS ? 'math' : '';
     const local = qualified.includes(':') ? qualified.split(':')[1] : qualified;
