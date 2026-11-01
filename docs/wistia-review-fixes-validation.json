@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-01",
+  "reviewed_commit": "ed4d15129136e260ca5a95d9c8c19869df3c42ed",
+  "scope": "Four correctness findings and three optimization opportunities from the follow-up review. Custom-element lifecycle and known preexisting form/template ownership limitations remain excluded.",
+  "fixes": [
+    {
+      "finding": "cssText corrupts semicolons inside CSS values",
+      "resolution": "Share a quote-, escape- and delimiter-aware declaration scanner between inline CSSOM and computed-style parsing.",
+      "tests": [
+        "Quoted data URLs and strings",
+        "Escaped quote/semicolon tokens and nested functions/brackets/braces",
+        "Inline and stylesheet computed values"
+      ]
+    },
+    {
+      "finding": "Typed event initialization assigns to getter-only defaultPrevented",
+      "resolution": "Read only declared typed-event dictionary fields, including inherited UI/mouse/modifier fields; ignore unknown/output-only Event members.",
+      "tests": [
+        "All 11 typed event constructors ignore unknown getter properties without reading them",
+        "Cancellation remains functional",
+        "Inherited fields remain available",
+        "Existing derived MessageEvent readonly getter regression still passes"
+      ]
+    },
+    {
+      "finding": "Replacing onmessage changes listener ordering",
+      "resolution": "Retain one lazy registered wrapper for each message event property; update its callback without re-registering. Null assignment removes the wrapper.",
+      "tests": [
+        "Both message and messageerror ordering",
+        "Null removal/re-activation and reset",
+        "Removal during dispatch"
+      ]
+    },
+    {
+      "finding": "Discarded srcdoc windows receive queued messages",
+      "resolution": "Verify the cached frame entry and current srcdoc remain active, in addition to existing parent generation/document/connectivity guards. Nested frames inherit the same liveness guard.",
+      "tests": [
+        "Discarded child and descendant messages are dropped",
+        "Current replacement child still receives messages",
+        "Changing srcdoc invalidates delivery even before reading the replacement contentWindow"
+      ]
+    }
+  ],
+  "optimizations": [
+    {
+      "change": "Cache parsed/serialized inline styles by their raw attribute string",
+      "invalidation": "Every read compares the current raw attribute; CSSOM writes update the cached parsed state and serialization. Regression tests cover direct attributes, CSSOM writes/removal, priorities, and removal of the whole attribute."
+    },
+    {
+      "change": "Allocate the iframe WeakMap only when contentWindow is first requested",
+      "measurement": "Removes one eager allocation per environment without frames; no isolated throughput claim."
+    },
+    {
+      "change": "Initialize template content lazily",
+      "measurement": "Parsed inflation and deep cloning can install their existing fragment without first allocating a fragment that is immediately discarded; no isolated throughput claim."
+    }
+  ],
+  "validation": {
+    "targeted_tests_passed": 32,
+    "new_regression_tests": 12,
+    "unit_tests_passed": 637,
+    "unit_tests_skipped": 4,
+    "unit_tests_failed": 0,
+    "vitest_tests_passed": 29,
+    "jest_tests_passed": 2,
+    "coverage_percent": {
+      "lines": 99.24,
+      "branches": 95.41,
+      "functions": 98.24
+    }
+  },
+  "performance": {
+    "platform": "linux-arm64",
+    "node": "24.19.0",
+    "style_read_microbenchmark": {
+      "command": "node bench/style-read.mjs",
+      "iterations_per_sample": 100000,
+      "samples": 5,
+      "warmup_reads": 10000,
+      "statistic": "Median milliseconds; lower is better. Same fixed five-declaration element; no mutations.",
+      "before_commit": "ed4d151",
+      "before_median_ms": {
+        "cssText": 212.114276,
+        "property": 113.426547
+      },
+      "after_median_ms": {
+        "cssText": 6.544077999999999,
+        "property": 27.181099999999986
+      },
+      "limits": "Repeated-read microbenchmark only; not an end-to-end Wistia runtime estimate. Shared machine load varied between runs."
+    },
+    "query_smoke": {
+      "command": "npm run bench:query",
+      "iterations_per_second": {
+        "turbo_dom": 809999,
+        "jsdom_29_1_1": 1161,
+        "happy_dom_20_14_5": 234296
+      },
+      "limits": "Ran while the Wistia integration sample was active. Smoke check only; do not compare absolute values to a quiet benchmark or replace the published query snapshot."
+    }
+  },
+  "wistia_integration": "Root agent is running the same 63-file frontend sample (original 56 plus seven follow-up regression files); results will be recorded separately after completion."
+}

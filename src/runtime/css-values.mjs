@@ -21,3 +21,25 @@ export function normalizeZeroLengths(property, value) {
   if (/[()'\"]/.test(trimmed)) return trimmed;
   return trimmed.replace(ZERO_LENGTH, (_, separator) => `${separator}0px`);
 }
+
+export function splitDeclarations(text) {
+  const declarations = [];
+  let start = 0, quote = '', depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\\') { i++; continue; }
+    if (quote) {
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+    else if (ch === ';' && depth === 0) {
+      declarations.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  declarations.push(text.slice(start));
+  return declarations;
+}

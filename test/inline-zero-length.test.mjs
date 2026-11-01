@@ -83,3 +83,76 @@ test('priorities and removal return normalized values without losing priority st
   assert.equal(actual.style.opacity, '0');
   assert.equal(actual.style.getPropertyValue('--offset'), '0');
 });
+
+test('CSS declarations preserve semicolons inside quoted strings, URLs and escaped tokens', () => {
+  const { actual, expected } = pair();
+  const declarations = [
+    ['background-image', 'url("data:image/png;base64,iVBORw0KGgo=")'],
+    ['content', '"left;right"'],
+    ['--quoted', "'left;right'"],
+    ['--escaped', String.raw`"left\";right"`],
+    ['--token', String.raw`left\;right`],
+    ['--function', 'fn(left; fn(inner; value))'],
+    ['--nested', '[left; {right; value}]'],
+    ['width', '0'],
+  ];
+  const text = declarations.map(([property, value]) => `${property}: ${value}`).join('; ');
+  for (const assign of [
+    element => { element.style.cssText = text; },
+    element => element.setAttribute('style', text),
+  ]) {
+    assign(actual);
+    assign(expected);
+    for (const [property] of declarations) {
+      assert.equal(actual.style.getPropertyValue(property), expected.style.getPropertyValue(property), property);
+    }
+    assert.ok(actual.style.cssText.includes('data:image/png;base64,iVBORw0KGgo='));
+    actual.style.height = '0';
+    assert.equal(actual.style.backgroundImage, expected.style.backgroundImage);
+    assert.equal(actual.style.content, expected.style.content);
+    assert.equal(actual.style.height, '0px');
+  }
+});
+
+test('style caches invalidate across attribute, CSSOM and priority mutations', () => {
+  const { actual } = pair();
+  const style = actual.style;
+  actual.setAttribute('style', 'left: 0 !important; content: "a;b"');
+  assert.equal(style.left, '0px');
+  assert.equal(style.cssText, style.cssText);
+  assert.equal(style.getPropertyPriority('left'), 'important');
+  actual.setAttribute('style', 'right: 2px; content: "c;d"');
+  assert.equal(style.left, '');
+  assert.equal(style.right, '2px');
+  assert.equal(style.content, '"c;d"');
+  assert.equal(style.getPropertyPriority('left'), '');
+  style.setProperty('right', '0', 'important');
+  assert.equal(style.right, '0px');
+  assert.match(style.cssText, /right: 0px !important/);
+  assert.equal(style.removeProperty('right'), '0px');
+  assert.doesNotMatch(style.cssText, /right/);
+  style.cssText = 'top: 0';
+  assert.equal(style.top, '0px');
+  assert.equal(style.content, '');
+  actual.removeAttribute('style');
+  assert.equal(style.cssText, '');
+  assert.equal(style.length, 0);
+});
+
+test('computed inline and stylesheet declarations preserve quoted semicolons', () => {
+  const { turbo, actual } = pair();
+  turbo.document.body.appendChild(actual);
+  actual.style.cssText = 'background-image: url("data:image/png;base64,a="); content: "a;b"; left: 0';
+  let computed = turbo.window.getComputedStyle(actual);
+  assert.equal(computed.backgroundImage, 'url("data:image/png;base64,a=")');
+  assert.equal(computed.content, '"a;b"');
+  assert.equal(computed.left, '0px');
+  actual.removeAttribute('style');
+  const sheet = turbo.document.createElement('style');
+  sheet.textContent = 'div { background-image: url("data:image/png;base64,b="); content: "c;d"; left: 0; }';
+  turbo.document.head.appendChild(sheet);
+  computed = turbo.window.getComputedStyle(actual);
+  assert.equal(computed.backgroundImage, 'url("data:image/png;base64,b=")');
+  assert.equal(computed.content, '"c;d"');
+  assert.equal(computed.left, '0px');
+});

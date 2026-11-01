@@ -242,3 +242,101 @@ test('MessageEvent subclasses can override readonly cancellation state', () => {
   assert.equal(uncancelable.defaultPrevented, false);
   assert.throws(() => { uncancelable.defaultPrevented = true; }, TypeError);
 });
+
+for (const type of ['message', 'messageerror']) {
+  test(`replacing on${type} preserves ordering and null assignment reactivates at the end`, () => {
+    const env = fresh();
+    const { window } = env;
+    const seen = [];
+    const property = 'on' + type;
+    window[property] = () => seen.push('old');
+    window.addEventListener(type, () => seen.push('listener'));
+    const replacement = function(event) {
+      assert.equal(this, window);
+      assert.equal(event.currentTarget, window);
+      seen.push('new');
+    };
+    window[property] = replacement;
+    assert.equal(window[property], replacement);
+    window.dispatchEvent(new window.MessageEvent(type));
+    assert.deepEqual(seen, ['new', 'listener']);
+    seen.length = 0;
+    window[property] = null;
+    window[property] = replacement;
+    window.dispatchEvent(new window.MessageEvent(type));
+    assert.deepEqual(seen, ['listener', 'new']);
+    seen.length = 0;
+    env.reset();
+    assert.equal(window[property], null);
+    window[property] = replacement;
+    window.dispatchEvent(new window.MessageEvent(type));
+    assert.deepEqual(seen, ['new']);
+  });
+
+  test(`clearing on${type} during dispatch does not invoke a removed handler`, () => {
+    const { window } = fresh();
+    const property = 'on' + type;
+    window.addEventListener(type, () => { window[property] = null; });
+    window[property] = () => assert.fail('removed handler called');
+    window.dispatchEvent(new window.MessageEvent(type));
+  });
+}
+
+test('srcdoc replacement invalidates queued messages in discarded children and descendants', async () => {
+  const { window, document } = fresh();
+  const frame = document.createElement('iframe');
+  frame.srcdoc = '<p>old</p>';
+  document.body.appendChild(frame);
+  const oldChild = frame.contentWindow;
+  const nestedFrame = oldChild.document.createElement('iframe');
+  oldChild.document.body.appendChild(nestedFrame);
+  const oldNested = nestedFrame.contentWindow;
+  const seen = [];
+  oldChild.onmessage = event => seen.push(event.data);
+  oldNested.onmessage = event => seen.push(event.data);
+  oldChild.postMessage('stale child', '*');
+  oldNested.postMessage('stale descendant', '*');
+  frame.srcdoc = '<p>new</p>';
+  const nextChild = frame.contentWindow;
+  assert.notEqual(nextChild, oldChild);
+  assert.equal(nextChild.parent, window);
+  assert.equal(nextChild.document.body.textContent, 'new');
+  nextChild.onmessage = event => seen.push(event.data);
+  nextChild.postMessage('current', '*');
+  await tick();
+  assert.deepEqual(seen, ['current']);
+  oldChild.postMessage('discarded child', '*');
+  oldNested.postMessage('discarded descendant', '*');
+  await tick();
+  assert.deepEqual(seen, ['current']);
+});
+
+test('srcdoc invalidates queued messages before the replacement window is read', async () => {
+  const { document } = fresh();
+  const frame = document.createElement('iframe');
+  frame.srcdoc = '<p>old</p>';
+  document.body.appendChild(frame);
+  const child = frame.contentWindow;
+  child.onmessage = () => assert.fail('discarded child received a message');
+  child.postMessage('stale', '*');
+  frame.srcdoc = '<p>new</p>';
+  await tick();
+});
+
+test('parsed and cloned nested templates retain independent fragment contents', () => {
+  const { document } = createEnvironment('<template><template><p>nested</p></template></template>');
+  const template = document.querySelector('template');
+  const fragment = template.content;
+  assert.equal(template.content, fragment);
+  const clone = template.cloneNode(true);
+  assert.equal(clone.innerHTML, template.innerHTML);
+  assert.notEqual(clone.content, fragment);
+  const nested = clone.content.firstElementChild;
+  assert.notEqual(nested.content, fragment.firstElementChild.content);
+  nested.content.firstElementChild.textContent = 'changed';
+  assert.equal(fragment.firstElementChild.content.textContent, 'nested');
+  assert.equal(nested.content.textContent, 'changed');
+  const container = document.createElement('div');
+  container.innerHTML = template.outerHTML;
+  assert.equal(container.firstElementChild.innerHTML, template.innerHTML);
+});

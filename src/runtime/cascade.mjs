@@ -16,7 +16,7 @@
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -56,7 +56,7 @@ function setProp(map, name, val) {
 
 function parseDecls(text, into) {
   const map = into || new Map();
-  for (const decl of text.split(';')) {
+  for (const decl of splitDeclarations(text)) {
     const c = decl.indexOf(':');
     if (c === -1) continue;
     const name = decl.slice(0, c).trim().toLowerCase();

@@ -258,12 +258,13 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   let messageHandler = null;
   let messageErrorHandler = null;
   let generation = 0;
-  const frames = new WeakMap();
+  let frames;
   const receiver = () => document.defaultView || windowProxy;
-  const setHandler = (type, previous, next) => {
-    if (previous) EventTarget.prototype.removeEventListener.call(receiver(), type, previous);
+  let messageListener, messageErrorListener;
+  const setHandler = (type, previous, next, listener) => {
     const handler = typeof next === 'function' ? next : null;
-    if (handler) EventTarget.prototype.addEventListener.call(receiver(), type, handler);
+    if (previous && !handler) EventTarget.prototype.removeEventListener.call(receiver(), type, listener);
+    else if (!previous && handler) EventTarget.prototype.addEventListener.call(receiver(), type, listener);
     return handler;
   };
 
@@ -290,9 +291,15 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     addEventListener: (...a) => EventTarget.prototype.addEventListener.call(receiver(), ...a),
     removeEventListener: (...a) => EventTarget.prototype.removeEventListener.call(receiver(), ...a),
     get onmessage() { return messageHandler; },
-    set onmessage(value) { messageHandler = setHandler('message', messageHandler, value); },
+    set onmessage(value) {
+      if (!messageListener && typeof value === 'function') messageListener = function(event) { return messageHandler?.call(this, event); };
+      messageHandler = setHandler('message', messageHandler, value, messageListener);
+    },
     get onmessageerror() { return messageErrorHandler; },
-    set onmessageerror(value) { messageErrorHandler = setHandler('messageerror', messageErrorHandler, value); },
+    set onmessageerror(value) {
+      if (!messageErrorListener && typeof value === 'function') messageErrorListener = function(event) { return messageErrorHandler?.call(this, event); };
+      messageErrorHandler = setHandler('messageerror', messageErrorHandler, value, messageErrorListener);
+    },
     postMessage(message, targetOrigin = '/', transfer = []) {
       if (typeof targetOrigin === 'object' && targetOrigin !== null) {
         transfer = targetOrigin.transfer ?? [];
@@ -394,18 +401,22 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   document.defaultView = windowProxy;
   document.__frameWindowFor = (frame) => {
     const html = frame.srcdoc;
+    if (!frames) frames = new WeakMap();
     let child = frames.get(frame);
     if (!child || child.html !== html) {
       const parentGeneration = generation;
       const childDocument = new DOMParser().parseFromString(html, 'text/html');
+      const entry = { html, window: null };
       const win = createWindow(childDocument, {
         url: frame.hasAttribute('srcdoc') ? 'about:srcdoc' : 'about:blank',
         parentWindow: receiver(), topWindow: receiver().top, frameElement: frame,
         inheritedOrigin: windowProxy.origin,
         isAncestorActive: () => parentGeneration === generation && receiver().document === document
-          && frame.isConnected && (!isAncestorActive || isAncestorActive()),
+          && frame.isConnected && frames.get(frame) === entry && frame.srcdoc === html
+          && (!isAncestorActive || isAncestorActive()),
       });
-      child = { html, window: win.window };
+      entry.window = win.window;
+      child = entry;
       frames.set(frame, child);
     }
     return child.window;

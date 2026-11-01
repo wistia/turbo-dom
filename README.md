@@ -136,6 +136,8 @@ reproduced failures and browser API probes. The five requested API groups are no
 all 58 fork-only failures pass. The combined 257-file sample has 2,201 passing tests,
 one deferred custom-element lifecycle failure, and 18 skipped/todo tests. See the
 [follow-up validation](docs/wistia-wave2-fixes-validation.json) for coverage and limits.
+The [review-fix validation](docs/wistia-review-fixes-validation.json) records subsequent
+CSS/event/iframe edge-case fixes and a repeated-style-read microbenchmark.
 
 | | turbo-dom | happy-dom | jsdom |
 |---|---|---|---|

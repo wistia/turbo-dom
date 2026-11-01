@@ -16,7 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -417,7 +417,7 @@ export class Element extends Node {
     this.__ns = namespace;            // '', 'svg', 'math'
     this.__attrs = undefined;         // lazily built (buffer or []) on first attr touch
     this.__attrIdx = -1;              // buffer index for lazy attr inflation
-    this.content = localName === 'template' && !namespace ? new DocumentFragment(ownerDocument) : null;
+    this.__content = localName === 'template' && !namespace ? undefined : null;
     this.shadowRoot = null;           // open shadow root, if attached
     // Predeclare the hot lazy fields (left at their "absent" sentinel) so every
     // Element shares ONE hidden class. Without this, fields added on demand in
@@ -431,6 +431,12 @@ export class Element extends Node {
     this.__shadow = undefined;         // attached shadow root (open or closed)
     this.__sheet = undefined;          // CSSOM CSSStyleSheet for <style> (lazy, CSS-in-JS)
   }
+
+  get content() {
+    if (this.__content === undefined) this.__content = new DocumentFragment(this.ownerDocument);
+    return this.__content;
+  }
+  set content(value) { this.__content = value; }
 
   get nodeType() { return ELEMENT_NODE; }
   get tagName() { return this.__ns ? this.localName : this.localName.toUpperCase(); }
@@ -1500,11 +1506,13 @@ export class XMLSerializer {
 
 // minimal inline-style CSSOM (honest: only inline + explicitly set props)
 function makeStyle(el) {
+  let cachedText, cachedStyle, cachedSerialization;
   // parse → { values: Map<prop,value>, prio: Map<prop,'important'|''> } (handles !important)
   const parse = (text = el.getAttribute('style') || '') => {
+    if (cachedStyle && text === cachedText) return cachedStyle;
     const values = new Map();
     const prio = new Map();
-    for (const decl of text.split(';')) {
+    for (const decl of splitDeclarations(text)) {
       const i = decl.indexOf(':');
       if (i === -1) continue;
       const prop = decl.slice(0, i).trim();
@@ -1514,10 +1522,17 @@ function makeStyle(el) {
       if (m) { val = val.slice(0, m.index).trim(); prio.set(prop, 'important'); }
       values.set(prop, val);
     }
-    return { values, prio };
+    cachedText = text;
+    cachedSerialization = undefined;
+    return cachedStyle = { values, prio };
   };
   const serialize = ({ values, prio }) => [...values].map(([k, v]) => `${k}: ${normalizeZeroLengths(k, v)}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; ');
-  const write = (style) => el.setAttribute('style', serialize(style));
+  const write = (style) => {
+    const text = serialize(style);
+    el.setAttribute('style', text);
+    cachedText = cachedSerialization = text;
+    cachedStyle = style;
+  };
   return new Proxy({}, {
     get(_t, key) {
       if (key === 'getPropertyValue') return (p) => styleGet(parse().values, p);
@@ -1526,7 +1541,7 @@ function makeStyle(el) {
       if (key === 'removeProperty') return (p) => { const s = parse(); const v = normalizeZeroLengths(p, s.values.get(p) ?? ''); s.values.delete(p); s.prio.delete(p); write(s); return v; };
       if (key === 'item') return (i) => [...parse().values.keys()][i] ?? '';
       if (key === 'length') return parse().values.size;
-      if (key === 'cssText') return serialize(parse());
+      if (key === 'cssText') { parse(); return cachedSerialization ??= serialize(cachedStyle); }
       if (key === 'cssFloat') return parse().values.get('float') ?? '';
       if (key === Symbol.iterator) { const keys = [...parse().values.keys()]; return keys[Symbol.iterator].bind(keys); }
       if (typeof key !== 'string') return undefined;

@@ -73,28 +73,38 @@ export class MessageEvent extends Event {
   }
 }
 
-// Typed events. Real libraries (RTL/user-event) construct these by name; we copy
-// the init dict onto the instance so common props (button, key, relatedTarget…) read back.
+// Typed event dictionaries include inherited fields and ignore unknown init members.
+const UI_DEFAULTS = { detail: 0, view: null };
+const MODIFIER_DEFAULTS = { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
+const MOUSE_DEFAULTS = {
+  ...UI_DEFAULTS, ...MODIFIER_DEFAULTS,
+  button: 0, buttons: 0, clientX: 0, clientY: 0, screenX: 0, screenY: 0,
+  movementX: 0, movementY: 0, relatedTarget: null,
+};
 const TYPED_DEFAULTS = {
-  UIEvent: { detail: 0, view: null },
-  MouseEvent: { button: 0, buttons: 0, clientX: 0, clientY: 0, screenX: 0, screenY: 0, relatedTarget: null, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false },
-  PointerEvent: { pointerId: 0, pointerType: '', button: 0, buttons: 0, clientX: 0, clientY: 0 },
-  KeyboardEvent: { key: '', code: '', keyCode: 0, which: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, repeat: false },
-  InputEvent: { data: null, inputType: '', isComposing: false },
-  FocusEvent: { relatedTarget: null },
-  CompositionEvent: { data: '' },
-  WheelEvent: { deltaX: 0, deltaY: 0, deltaZ: 0, deltaMode: 0 },
-  TouchEvent: { touches: [], targetTouches: [], changedTouches: [] },
-  DragEvent: { dataTransfer: null },
+  UIEvent: UI_DEFAULTS,
+  MouseEvent: MOUSE_DEFAULTS,
+  PointerEvent: { ...MOUSE_DEFAULTS, pointerId: 0, pointerType: '', width: 1, height: 1, pressure: 0, tangentialPressure: 0, tiltX: 0, tiltY: 0, twist: 0, isPrimary: false },
+  KeyboardEvent: { ...UI_DEFAULTS, ...MODIFIER_DEFAULTS, key: '', code: '', keyCode: 0, charCode: 0, which: 0, location: 0, repeat: false, isComposing: false },
+  InputEvent: { ...UI_DEFAULTS, data: null, inputType: '', isComposing: false },
+  FocusEvent: { ...UI_DEFAULTS, relatedTarget: null },
+  CompositionEvent: { ...UI_DEFAULTS, data: '' },
+  WheelEvent: { ...MOUSE_DEFAULTS, deltaX: 0, deltaY: 0, deltaZ: 0, deltaMode: 0 },
+  TouchEvent: { ...UI_DEFAULTS, ...MODIFIER_DEFAULTS, touches: [], targetTouches: [], changedTouches: [] },
+  DragEvent: { ...MOUSE_DEFAULTS, dataTransfer: null },
   ProgressEvent: { lengthComputable: false, loaded: 0, total: 0 },
 };
 
 function makeTyped(name) {
   const defaults = TYPED_DEFAULTS[name];
+  const fields = Object.keys(defaults);
   const cls = class extends Event {
     constructor(type, init = {}) {
       super(type, init);
-      Object.assign(this, defaults, init);
+      for (const field of fields) {
+        const value = init[field];
+        this[field] = value === undefined ? defaults[field] : value;
+      }
     }
   };
   // legacy initMouseEvent/initKeyboardEvent/initUIEvent(type, bubbles, cancelable, ...rest)
