@@ -26,12 +26,25 @@ class TurboDomEnvironment extends NodeEnvironment {
     await super.setup();
     // runtime is ESM; load it dynamically from this CJS environment
     const { installGlobals } = await import('./install.mjs');
-    installGlobals(this.global, this.__opts.turboDom || this.__opts);
+    this.__installation = installGlobals(this.global, this.__opts.turboDom || this.__opts);
   }
 
   async teardown() {
-    if (this.global && this.global.__turboDom) this.global.__turboDom.reset();
-    await super.teardown();
+    const installation = this.__installation;
+    this.__installation = null;
+    try {
+      this.fakeTimersModern?.useRealTimers();
+      this.fakeTimers?.useRealTimers();
+    } finally {
+      try {
+        if (installation) {
+          try { installation.env.reset(); }
+          finally { installation.teardown(); }
+        }
+      } finally {
+        await super.teardown();
+      }
+    }
   }
 }
 

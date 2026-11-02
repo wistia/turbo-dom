@@ -233,17 +233,21 @@ const hostSetInterval = globalThis.setInterval;
 const hostClearInterval = globalThis.clearInterval;
 const hostQueueMicrotask = globalThis.queueMicrotask;
 const hostStructuredClone = globalThis.structuredClone;
+const ownedTimerFunctions = new WeakSet();
+const timerClockCalls = new WeakMap();
+const runningTimerMock = timer => timer?._isMockFunction && timer.mock?.results?.at(-1)?.type === 'incomplete';
+const hostTimers = { setTimeout: hostSetTimeout, clearTimeout: hostClearTimeout, setInterval: hostSetInterval, clearInterval: hostClearInterval };
 let activeMessageWindow = null;
 
-export function createWindow(document, { url = 'http://localhost/', parentWindow = null, topWindow = null, frameElement = null, inheritedOrigin, isAncestorActive = null } = {}) {
+export function createWindow(document, { url = 'http://localhost/', parentWindow = null, topWindow = null, frameElement = null, inheritedOrigin, isAncestorActive = null, timerHost = globalThis, timerFallbacks = hostTimers } = {}) {
   const touched = new Set();
   let windowProxy;
   let messageHandler = null;
   let messageErrorHandler = null;
   let generation = 0;
-  let frames;
+  let frames, childWindows;
   let customElements;
-  let animationFrames, disposed = false;
+  let animationFrames, timers, disposed = false;
   const frameState = () => animationFrames ||= { active: true, pending: new Map() };
   const clearAnimationFrames = () => {
     if (!animationFrames) return;
@@ -251,6 +255,72 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     for (const [id, cancel] of animationFrames.pending) cancel(id);
     animationFrames.pending.clear();
     animationFrames = undefined;
+  };
+  const fallbackTimer = name => {
+    const fallback = timerFallbacks[name] || globalThis[name];
+    return typeof fallback === 'function' && !ownedTimerFunctions.has(fallback) && !runningTimerMock(fallback) ? fallback : hostTimers[name];
+  };
+  const resolveTimer = name => {
+    const live = timerHost[name];
+    return typeof live === 'function' && !ownedTimerFunctions.has(live) && !runningTimerMock(live) ? live : fallbackTimer(name);
+  };
+  // A call-through spy can reenter an owned delegate; only its outer call owns the timer.
+  const callTimer = (name, timer, args) => {
+    let calls = timerClockCalls.get(timerHost);
+    if (!calls) timerClockCalls.set(timerHost, calls = {});
+    const previous = calls[name] || 0;
+    calls[name] = previous + 1;
+    try { return (runningTimerMock(timer) ? fallbackTimer(name) : timer).apply(timerHost, args); }
+    finally { calls[name] = previous; }
+  };
+  const timerState = () => timers ||= { active: true, pending: new Map() };
+  const clearTimers = () => {
+    if (!timers) return;
+    timers.active = false;
+    for (const [id, cancel] of timers.pending) cancel(id);
+    timers.pending.clear();
+    timers = undefined;
+  };
+  const makeTimer = repeat => {
+    const state = timerState();
+    const name = repeat ? 'setInterval' : 'setTimeout';
+    const clearName = repeat ? 'clearInterval' : 'clearTimeout';
+    let start, cancel;
+    const schedule = (callback, delay, ...args) => {
+      if (timerClockCalls.get(timerHost)?.[name]) return start.call(timerHost, callback, delay, ...args);
+      if (typeof callback !== 'function') throw new TypeError('Timer callback must be a function');
+      if (!state.active || disposed || (isAncestorActive && !isAncestorActive())) return 0;
+      const id = callTimer(name, start, [() => {
+        if (!state.pending.has(id) || !state.active || disposed || (isAncestorActive && !isAncestorActive())) return;
+        if (!repeat) state.pending.delete(id);
+        callback.apply(receiver(), args);
+      }, delay]);
+      state.pending.set(id, id => callTimer(clearName, cancel, [id]));
+      return id;
+    };
+    ownedTimerFunctions.add(schedule);
+    if (!(name in base)) { base[name] = schedule; touched.add(name); }
+    start = resolveTimer(name);
+    cancel = resolveTimer(clearName);
+    return schedule;
+  };
+  const makeClearTimer = (name = 'clearTimeout') => {
+    const state = timerState();
+    let clock;
+    const clear = id => {
+      if (timerClockCalls.get(timerHost)?.[name]) return clock.call(timerHost, id);
+      const cancel = state.pending.get(id);
+      if (cancel) { state.pending.delete(id); cancel(id); }
+    };
+    ownedTimerFunctions.add(clear);
+    if (!(name in base)) { base[name] = clear; touched.add(name); }
+    clock = resolveTimer(name);
+    return clear;
+  };
+  const disposeChildren = () => {
+    if (childWindows) for (const child of childWindows) child.dispose();
+    childWindows = undefined;
+    frames = undefined;
   };
   const customContext = () => customElements ||= createCustomElementContext(document, HtmlElement, isAncestorActive);
   const receiver = () => document.defaultView || windowProxy;
@@ -263,7 +333,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   };
 
   // Per-env globals: only the ~11 that capture document/url/windowProxy. Everything
-  // stateless (constructors, timers, stateless window methods) lives in the shared
+  // stateless (constructors and stateless window methods) lives in the shared
   // module-level STATIC_BASE, built ONCE — not rebuilt per createWindow (per test
   // file). The Proxy below reads base first, then STATIC_BASE, then lazy; a
   // `window.x = y` assignment writes to base, shadowing STATIC_BASE per-env.
@@ -314,7 +384,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
       }
       const { data, ports } = cloneMessage(message, transfer);
       const sentGeneration = generation;
-      (globalThis.setTimeout || hostSetTimeout)(() => {
+      windowProxy.setTimeout(() => {
         if (sentGeneration !== generation || target.document !== document || (isAncestorActive && !isAncestorActive())
           || (allowedOrigin !== '*' && allowedOrigin !== windowProxy.origin)) return;
         const event = new MessageEvent('message', { data, origin, source, ports });
@@ -328,18 +398,30 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    setTimeout: () => makeTimer(false),
+    setInterval: () => makeTimer(true),
+    clearTimeout: () => makeClearTimer('clearTimeout'),
+    clearInterval: () => makeClearTimer('clearInterval'),
+    requestIdleCallback: () => {
+      const schedule = makeTimer(false);
+      return callback => {
+        if (typeof callback !== 'function') throw new TypeError('Idle callback must be a function');
+        return schedule(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 0);
+      };
+    },
+    cancelIdleCallback: makeClearTimer,
     requestAnimationFrame: () => {
       const state = frameState();
       return callback => {
         if (typeof callback !== 'function') throw new TypeError('Animation frame callback must be a function');
         if (!state.active || disposed || (isAncestorActive && !isAncestorActive())) return 0;
-        const schedule = globalThis.setTimeout || hostSetTimeout;
-        const cancel = globalThis.clearTimeout || hostClearTimeout;
-        const id = schedule(() => {
+        const schedule = resolveTimer('setTimeout');
+        const cancel = resolveTimer('clearTimeout');
+        const id = callTimer('setTimeout', schedule, [() => {
           if (!state.pending.delete(id) || !state.active || disposed || (isAncestorActive && !isAncestorActive())) return;
           callback(now());
-        }, 16);
-        state.pending.set(id, cancel);
+        }, 16]);
+        state.pending.set(id, id => callTimer('clearTimeout', cancel, [id]));
         return id;
       };
     },
@@ -439,7 +521,8 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
 
   document.defaultView = windowProxy;
   function discardFrames(node) {
-    frames?.delete(node);
+    const child = frames?.get(node);
+    if (child) { child.dispose(); childWindows.delete(child); frames.delete(node); }
     if (node.__kids) for (const child of node.__kids) discardFrames(child);
   }
   document.__frameWindowFor = (frame) => {
@@ -448,20 +531,23 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     if (!frames) frames = new WeakMap();
     let child = frames.get(frame);
     if (!child || child.html !== html || child.hasSrcdoc !== hasSrcdoc) {
+      if (child) { child.dispose(); childWindows.delete(child); }
       const parentGeneration = generation;
       const childDocument = new DOMParser().parseFromString(html, 'text/html');
-      const entry = { html, hasSrcdoc, window: null };
+      const entry = { html, hasSrcdoc, window: null, dispose: null };
       childDocument.__geometry = document.__geometry;
       const win = createWindow(childDocument, {
         url: hasSrcdoc ? 'about:srcdoc' : 'about:blank',
         parentWindow: receiver(), topWindow: receiver().top, frameElement: frame,
-        inheritedOrigin: windowProxy.origin,
+        inheritedOrigin: windowProxy.origin, timerHost, timerFallbacks,
         isAncestorActive: () => parentGeneration === generation && receiver().document === document
           && frame.isConnected && frame.ownerDocument === document && frames.get(frame) === entry
           && frame.srcdoc === html && frame.hasAttribute('srcdoc') === hasSrcdoc
           && (!isAncestorActive || isAncestorActive()),
       });
       entry.window = win.window;
+      entry.dispose = win.dispose;
+      (childWindows ||= new Set()).add(entry);
       child = entry;
       frames.set(frame, child);
       document.__discardFrames ||= discardFrames;
@@ -481,10 +567,14 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
       customElements?.dispose(); customElements = null;
       generation++;
       clearAnimationFrames();
+      clearTimers();
+      disposeChildren();
       disposed = true;
     },
     resetGlobals() {
       clearAnimationFrames();
+      clearTimers();
+      disposeChildren();
       disposed = false;
       document.__fragmentRealm = undefined;
       customElements?.dispose(); customElements = null;
@@ -707,17 +797,9 @@ const STATIC_BASE = {
   MessageChannel, MessagePort,
   BroadcastChannel: globalThis.BroadcastChannel, EventSource: globalThis.EventSource,
   reportError: (e) => { void e; },
-  requestIdleCallback: (cb) => hostSetTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 0),
-  cancelIdleCallback: (id) => hostClearTimeout(id),
   CSS: { supports: () => true, escape: (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c) },
   XMLHttpRequest: makeXHR(),
   Worker: class Worker { constructor() {} postMessage() {} terminate() {} addEventListener() {} removeEventListener() {} },
-  // timers delegate to captured host fns (NOT bare names — installed bare names
-  // would resolve back here → recursion)
-  setTimeout: (...a) => hostSetTimeout(...a),
-  clearTimeout: (...a) => hostClearTimeout(...a),
-  setInterval: (...a) => hostSetInterval(...a),
-  clearInterval: (...a) => hostClearInterval(...a),
   queueMicrotask: (...a) => hostQueueMicrotask(...a),
   structuredClone: (...a) => hostStructuredClone(...a),
   scrollTo() {}, scroll() {}, scrollBy() {},

@@ -214,11 +214,15 @@ Latest (darwin-arm64, Node 24, `npm run bench:all`), vs jsdom / happy-dom:
   loops forever if the clock never advances. So (1) `setClock(fn)` (exported from runtime) installs a
   clock that `window.performance.now()` AND the **rAF callback timestamp** both read through `now()`;
   default null → real host clock (no change for vitest/jest). (2) `requestAnimationFrame` schedules via
-  the **live `globalThis.setTimeout`** (not the module-captured host) with a **16ms** frame delay, so a
+  the installed realm's **live `setTimeout`** (with captured-host fallbacks that avoid
+  timer-delegate recursion) with a **16ms** frame delay, so a
   render tier that owns `setTimeout` (a virtual-clock pump) catches every reschedule and advances time
   per frame. Pending animation frames are window-owned and are cancelled on reset or
   environment disposal, with stale callback/scheduler handles prevented from reaching a
-  later generation. (3) `MessageChannel`/`MessagePort` are a **real built-in polyfill** (not a host
+  later generation. Ordinary timeouts, intervals and idle callbacks are also window-owned;
+  child-window queues are physically cancelled on removal, navigation, reset or disposal.
+  Jest uses its VM timer realm so fake clocks advance frames and timers together.
+  (3) `MessageChannel`/`MessagePort` are a **real built-in polyfill** (not a host
   passthrough) whose delivery also routes through live `globalThis.setTimeout` (delay 0 = a yield) — so
   React 19's scheduler (which posts its work loop through a MessagePort) runs in the owned/virtual
   queue, and a `MessageChannel` exists in the bare V8 isolate (host has none). `Date.now` is the

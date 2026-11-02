@@ -12,7 +12,9 @@ const DEFAULT_HTML = '<!doctype html><html><head></head><body></body></html>';
 const SELF_KEYS = ['window', 'self', 'parent', 'top', 'frames'];
 
 export function installGlobals(target, { html = DEFAULT_HTML, url, geometry } = {}) {
-  const env = createEnvironment(html, { url, geometry });
+  const timerFallbacks = {};
+  for (const name of ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval']) timerFallbacks[name] = target[name];
+  const env = createEnvironment(html, { url, geometry, timerHost: target, timerFallbacks });
   const { window } = env;
 
   const installed = [];                 // keys we defined
