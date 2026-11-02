@@ -41,6 +41,7 @@ export class CSSStyleRule {
         const important = /\s*!\s*important\s*$/i.exec(value);
         values.set(name, important ? value.slice(0, important.index).trim() : value);
         if (important) priorities.set(name, 'important');
+        else priorities.delete(name);
       }
     }
     return { getPropertyValue: property => values.get(property) || '', getPropertyPriority: property => priorities.get(property) || '' };

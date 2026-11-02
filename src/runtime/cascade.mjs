@@ -129,12 +129,13 @@ function buildIndex(scope) {
   const rules = [];
   let order = 0;
   for (let i = 0; i < styles.length; i++) {
-    order = parseStylesheet(styles[i].textContent || '', order, rules);
-    // CSS-in-JS engines inject via sheet.insertRule(), which never touches
-    // textContent. Read those rules too (only present on emotion-touched <style>s;
-    // __sheet is undefined otherwise, so plain stylesheets pay nothing here).
-    const sheet = styles[i].__sheet;
-    if (sheet) for (let k = 0; k < sheet.cssRules.length; k++) order = parseStylesheet(sheet.cssRules[k].cssText, order, rules);
+    const style = styles[i];
+    // An existing CSSOM sheet is authoritative; its authored rules may have been
+    // deleted or reordered without changing the original DOM text.
+    if (style.__sheet) {
+      const sheet = style.sheet;
+      for (let k = 0; k < sheet.cssRules.length; k++) order = parseStylesheet(sheet.cssRules[k].cssText, order, rules);
+    } else order = parseStylesheet(style.textContent || '', order, rules);
   }
   return rules;
 }

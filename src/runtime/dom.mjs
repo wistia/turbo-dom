@@ -214,6 +214,7 @@ export class Node extends EventTarget {
     const i = kids.indexOf(node);
     if (i === -1) throw new Error('NotFoundError: node is not a child');
     const next = kids[i + 1] || null;
+    if (this.ownerDocument?.__nodeIterators) adjustIteratorsForRemoval(node);
     clearRemovedFocus(node);
     if (this.ownerDocument?.__ceActive && isNodeConnected(node)) customElementsRemoved(node);
     this.ownerDocument?.__discardFrames?.(node);
@@ -260,11 +261,16 @@ export class Node extends EventTarget {
     let changed = false;
     for (let i = kids.length - 1; i > 0; i--) {
       if (kids[i].nodeType === TEXT_NODE && kids[i - 1].nodeType === TEXT_NODE) {
-        kids[i - 1]._data += kids[i].data; kids[i].parentNode = null; kids.splice(i, 1); changed = true;
+        kids[i - 1]._data += kids[i].data;
+        if (this.ownerDocument?.__nodeIterators) adjustIteratorsForRemoval(kids[i]);
+        kids[i].parentNode = null; kids.splice(i, 1); changed = true;
       }
     }
     for (let i = kids.length - 1; i >= 0; i--) {
-      if (kids[i].nodeType === TEXT_NODE && kids[i].data === '') { kids[i].parentNode = null; kids.splice(i, 1); changed = true; }
+      if (kids[i].nodeType === TEXT_NODE && kids[i].data === '') {
+        if (this.ownerDocument?.__nodeIterators) adjustIteratorsForRemoval(kids[i]);
+        kids[i].parentNode = null; kids.splice(i, 1); changed = true;
+      }
       else if (kids[i].nodeType === ELEMENT_NODE) kids[i].normalize();
     }
     // normalize mutates __kids in place — bump __version (invalidate cached queries)
@@ -299,7 +305,7 @@ export class Node extends EventTarget {
     // `querySelectorAll('style').map(s => s.textContent)` see the injected CSS.
     // __sheet is only ever set on <style> elements (sheet getter gates on it), so
     // this is one predicted-false read for every other element on the hot path.
-    const sheet = this.__sheet;
+    const sheet = this.__sheet ? this.sheet : null;
     if (sheet && sheet.cssRules.length) {
       const kids = this.__children();
       let css = '';
@@ -339,6 +345,7 @@ export class Node extends EventTarget {
   // node object yet, so nothing can be holding it — inflating a whole child list just to
   // null out parent pointers would put an allocation on the React container-clear path.
   __detachKids() {
+    if (this.ownerDocument?.__nodeIterators) adjustIteratorsForRemoval(this, true);
     clearRemovedFocus(this, true);
     const kids = this.__kids;
     if (kids) for (let i = 0; i < kids.length; i++) {
@@ -681,8 +688,9 @@ export class Element extends Node {
   setSelectionRange(s, e, dir = 'none') { this.__selStart = s; this.__selEnd = e; this.__selDir = dir; }
   setRangeText(replacement, start = this.__selStart ?? 0, end = this.__selEnd ?? 0, mode = 'preserve') {
     const value = this.value ?? '';
-    start = Math.min(Number(start) >>> 0, value.length); end = Math.min(Number(end) >>> 0, value.length);
+    start = Number(start) >>> 0; end = Number(end) >>> 0;
     if (start > end) throw new DOMException('Start exceeds end', 'IndexSizeError');
+    start = Math.min(start, value.length); end = Math.min(end, value.length);
     replacement = String(replacement);
     const selectionStart = this.selectionStart ?? 0, selectionEnd = this.selectionEnd ?? 0;
     setElementValue.call(this, value.slice(0, start) + replacement + value.slice(end));
@@ -1327,6 +1335,15 @@ function newElement(doc, tag, ns) {
 
 // ---------------------------------------------------- DocumentFragment ----
 export class DocumentFragment extends Node {
+  constructor(doc, realm) {
+    super(doc);
+    const realmOwner = doc?.__templateRealmOwner || doc;
+    if (!realm && realmOwner) realm = doc.__fragmentRealm ||= realmOwner.__fragmentRealm ||= {};
+    if (new.target === DocumentFragment) {
+      const Fragment = realm?.Fragment || realmOwner?.defaultView?.DocumentFragment;
+      if (Fragment) Object.setPrototypeOf(this, Fragment.prototype);
+    } else if (realm) Object.defineProperty(this, '__fragmentRealm', { value: realm });
+  }
   get nodeType() { return DOCUMENT_FRAGMENT_NODE; }
   get nodeName() { return '#document-fragment'; }
   get firstElementChild() { for (const child of this.__children()) if (child.nodeType === ELEMENT_NODE) return child; return null; }
@@ -1554,6 +1571,7 @@ function compareBoundaryPoints(a, offsetA, b, offsetB) {
 
 export class Range {
   constructor(doc) {
+    if (new.target === Range && doc?.defaultView) Object.setPrototypeOf(this, doc.defaultView.Range.prototype);
     this.__doc = doc;
     this.startContainer = doc; this.endContainer = doc;
     this.startOffset = 0; this.endOffset = 0; this.collapsed = true;
@@ -1682,7 +1700,7 @@ class TreeWalker {
     this.referenceNode = root; this.pointerBeforeReferenceNode = true;
   }
   __show(node) {
-    const bit = node.nodeType === ELEMENT_NODE ? 1 : node.nodeType === TEXT_NODE ? 4 : node.nodeType === COMMENT_NODE ? 128 : 0xffffffff;
+    const bit = 1 << (node.nodeType - 1);
     if (!(this.whatToShow & bit) && this.whatToShow !== 0xffffffff) return 3; // FILTER_SKIP
     if (this.filter) {
       const fn = typeof this.filter === 'function' ? this.filter : this.filter.acceptNode;
@@ -1726,56 +1744,72 @@ function followingNode(node, root) {
   }
   return null;
 }
+function precedingNode(node, root) {
+  if (node === root) return null;
+  if (!node.previousSibling) return node.parentNode;
+  node = node.previousSibling;
+  while (node.lastChild) node = node.lastChild;
+  return node;
+}
+
+function adjustIteratorsForRemoval(node, childrenOnly = false) {
+  const iterators = node.ownerDocument.__nodeIterators;
+  for (const registration of iterators) {
+    const iterator = registration.deref();
+    if (!iterator) { iterators.delete(registration); continue; }
+    if (!node.contains(iterator.referenceNode) ||
+      (node.contains(iterator.root) && (!childrenOnly || iterator.root !== node)) ||
+      (childrenOnly && iterator.referenceNode === node)) continue;
+    if (childrenOnly) {
+      iterator.referenceNode = node;
+      iterator.pointerBeforeReferenceNode = false;
+    } else {
+      if (iterator.pointerBeforeReferenceNode) {
+        let next = node;
+        while (next !== iterator.root && !next.nextSibling) next = next.parentNode;
+        next = next === iterator.root ? null : next.nextSibling;
+        if (next) { iterator.referenceNode = next; iterator.currentNode = next; continue; }
+      }
+      iterator.referenceNode = precedingNode(node, iterator.root);
+      iterator.pointerBeforeReferenceNode = false;
+    }
+    iterator.currentNode = iterator.referenceNode;
+  }
+}
+
+let iteratorFinalizer;
+
 class NodeIterator extends TreeWalker {
-  __remember(node) {
-    const predecessors = [];
-    let previous = node;
-    while (previous && previous !== this.root) {
-      let sibling = previous.previousSibling;
-      if (sibling) { while (sibling.lastChild) sibling = sibling.lastChild; predecessors.push(sibling); }
-      previous = previous.parentNode;
-      if (previous) predecessors.push(previous);
-    }
-    this.__predecessors = predecessors;
-    const successors = [];
-    if (node.firstChild) successors.push(node.firstChild);
-    let ancestor = node;
-    while (ancestor && ancestor !== this.root) {
-      if (ancestor.nextSibling) successors.push(ancestor.nextSibling);
-      ancestor = ancestor.parentNode;
-    }
-    this.__successors = successors;
+  constructor(root, whatToShow, filter) {
+    super(root, whatToShow, filter);
+    const registration = new WeakRef(this);
+    const document = root.ownerDocument;
+    registration.documents = document.__nodeIterators ||= new Set();
+    registration.roots = root.__rootIterators ||= new Set();
+    registration.documents.add(registration);
+    registration.roots.add(registration);
+    iteratorFinalizer ||= new FinalizationRegistry(reference => {
+      reference.documents.delete(reference);
+      reference.roots.delete(reference);
+    });
+    iteratorFinalizer.register(this, registration);
   }
   previousNode() {
-    let node = this.referenceNode;
-    const preceding = current => {
-      if (current === this.root) return null;
-      if (!current.previousSibling) return current.parentNode;
-      current = current.previousSibling;
-      while (current.lastChild) current = current.lastChild;
-      return current;
-    };
-    if (!this.root.contains(node)) node = this.__predecessors?.find(candidate => this.root.contains(candidate)) || null;
-    else if (this.pointerBeforeReferenceNode) node = preceding(node);
+    let node = this.pointerBeforeReferenceNode ? precedingNode(this.referenceNode, this.root) : this.referenceNode;
     while (node) {
       if (this.__show(node) === 1) {
         this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = true;
-        this.__remember(node);
         return node;
       }
-      node = preceding(node);
+      node = precedingNode(node, this.root);
     }
     return null;
   }
   nextNode() {
-    let node;
-    if (!this.root.contains(this.referenceNode)) node = this.__successors?.find(candidate => this.root.contains(candidate)) || null;
-    else if (this.pointerBeforeReferenceNode) node = this.referenceNode;
-    else node = followingNode(this.referenceNode, this.root);
+    let node = this.pointerBeforeReferenceNode ? this.referenceNode : followingNode(this.referenceNode, this.root);
     while (node) {
       if (this.__show(node) === 1) {
         this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = false;
-        this.__remember(node);
         return node;
       }
       node = followingNode(node, this.root);
@@ -1987,6 +2021,13 @@ function adoptInto(node, doc, discardFrames = true) {
   const kids = node.__children ? node.__children() : []; // inflate off the OLD buffer
   node.__idx = -1;
   const previousDocument = node.ownerDocument;
+  if (node.__rootIterators) for (const registration of node.__rootIterators) {
+    previousDocument.__nodeIterators.delete(registration);
+    if (registration.deref()) {
+      registration.documents = doc.__nodeIterators ||= new Set();
+      registration.documents.add(registration);
+    } else node.__rootIterators.delete(registration);
+  }
   node.ownerDocument = doc;
   if (previousDocument?.__ceActive) customElementAdopted(node, previousDocument, doc);
   if (node.__shadow) adoptInto(node.__shadow, doc, false);
@@ -2209,6 +2250,8 @@ export class Document extends Node {
     if (!this.__templateDocument) {
       const document = new Document();
       document.__isTemplateDocument = true;
+      document.__templateRealmOwner = this;
+      document.__fragmentRealm = this.__fragmentRealm ||= {};
       document.__buf = this.__buf;
       this.__templateDocument = document;
     }

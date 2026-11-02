@@ -328,13 +328,21 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   const lazy = {
     Range: () => {
       function WindowRange() { if (!new.target) throw new TypeError('Range requires new'); return Reflect.construct(Range, [document], new.target); }
-      WindowRange.prototype = Range.prototype;
+      WindowRange.prototype = Object.create(Range.prototype, { constructor: { value: WindowRange, writable: true, configurable: true } });
       return WindowRange;
     },
     DocumentFragment: () => {
-      function WindowDocumentFragment() { if (!new.target) throw new TypeError('DocumentFragment requires new'); return Reflect.construct(DocumentFragment, [document], new.target); }
-      WindowDocumentFragment.prototype = DocumentFragment.prototype;
-      return WindowDocumentFragment;
+      const realm = document.__fragmentRealm ||= {};
+      if (realm.Fragment) return realm.Fragment;
+      function WindowDocumentFragment() { if (!new.target) throw new TypeError('DocumentFragment requires new'); return Reflect.construct(DocumentFragment, [document, realm], new.target); }
+      WindowDocumentFragment.prototype = Object.create(DocumentFragment.prototype, { constructor: { value: WindowDocumentFragment, writable: true, configurable: true } });
+      Object.defineProperty(WindowDocumentFragment, Symbol.hasInstance, {
+        value(instance) {
+          if (Function.prototype[Symbol.hasInstance].call(this, instance)) return true;
+          return this === WindowDocumentFragment && instance instanceof DocumentFragment && instance.__fragmentRealm === realm;
+        },
+      });
+      return realm.Fragment = WindowDocumentFragment;
     },
     HTMLElement: () => customContext().HTMLElement,
     customElements: () => customContext().registry,
@@ -446,6 +454,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     // Layer 5: drop materialized global slots, keep the class machinery warm.
     disposeCustomElements() { customElements?.dispose(); customElements = null; },
     resetGlobals() {
+      document.__fragmentRealm = undefined;
       customElements?.dispose(); customElements = null;
       generation++;
       frames = undefined;
