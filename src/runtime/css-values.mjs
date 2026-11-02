@@ -12,6 +12,8 @@ const LENGTH_PROPS = new Set([
   'outline-width', 'outline-offset', 'border-spacing',
   'font-size', 'letter-spacing', 'word-spacing', 'text-indent', 'vertical-align',
 ]);
+const SIZING_PROPS = new Set(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height', 'inline-size', 'block-size', 'min-inline-size', 'max-inline-size', 'min-block-size', 'max-block-size', 'flex-basis']);
+const CSS_DIMENSION = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(px|em|rem|ex|rex|cap|rcap|ch|rch|ic|ric|lh|rlh|vw|vh|vi|vb|vmin|vmax|svw|svh|svi|svb|svmin|svmax|lvw|lvh|lvi|lvb|lvmin|lvmax|dvw|dvh|dvi|dvb|dvmin|dvmax|cqw|cqh|cqi|cqb|cqmin|cqmax|cm|mm|q|in|pt|pc|%)$/i;
 const COMPOUND_LENGTH_PROPS = new Set(['margin', 'padding', 'border-width', 'border-spacing']);
 const ZERO_NUMBER = /^[+-]?(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?$/i;
 const ZERO_LENGTH = /(^|\s)[+-]?(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?(?=$|\s)/gi;
@@ -19,9 +21,59 @@ const ZERO_LENGTH = /(^|\s)[+-]?(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?(?=$|\s)/gi;
 export function normalizeZeroLengths(property, value) {
   if (!LENGTH_PROPS.has(property)) return value;
   const trimmed = value.trim();
-  if (!COMPOUND_LENGTH_PROPS.has(property)) return ZERO_NUMBER.test(trimmed) ? '0px' : trimmed;
+  if (!COMPOUND_LENGTH_PROPS.has(property)) {
+    if (ZERO_NUMBER.test(trimmed)) return '0px';
+    const dimension = CSS_DIMENSION.exec(trimmed);
+    return dimension ? `${Number(dimension[1])}${dimension[2]}` : trimmed;
+  }
   if (/[()'\"]/.test(trimmed)) return trimmed;
   return trimmed.replace(ZERO_LENGTH, (_, separator) => `${separator}0px`);
+}
+
+export function isValidSizingValue(property, value) {
+  if (!SIZING_PROPS.has(property)) return true;
+  const text = value.trim().toLowerCase();
+  if (/^(inherit|initial|unset|revert|revert-layer|min-content|max-content|fit-content|stretch|contain)$/.test(text)) return true;
+  if (text === 'auto') return !property.startsWith('max-');
+  if (text === 'none') return property.startsWith('max-');
+  if (ZERO_NUMBER.test(text)) return true;
+  const dimension = CSS_DIMENSION.exec(text);
+  if (dimension) return Number(dimension[1]) >= 0 && Number.isFinite(Number(dimension[1]));
+  if (!/^(calc|min|max|clamp|var|env|fit-content|calc-size|anchor-size)\(/.test(text)) return false;
+  let depth = 0, quote = '';
+  for (let i = 0; i < text.length; i++) {
+    const character = text[i];
+    if (character === '\\') { i++; continue; }
+    if (quote) { if (character === quote) quote = ''; continue; }
+    if (character === '"' || character === "'") { quote = character; continue; }
+    if (character === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      if (end === -1) return false;
+      i = end + 1;
+      continue;
+    }
+    if (character === '(') depth++;
+    else if (character === ')' && --depth === 0) return !text.slice(i + 1).replace(/\/\*[\s\S]*?\*\//g, '').trim();
+  }
+  return false;
+}
+
+export function expandBorderShorthand(property, value) {
+  const match = /^border(?:-(top|right|bottom|left))?$/.exec(property);
+  if (!match) return null;
+  let width = 'medium', style = 'none', color = '';
+  const deferred = /var\(/i.test(value);
+  if (!deferred) for (const token of value.trim().split(/\s+/)) {
+    if (/^(none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset)$/.test(token)) style = token;
+    else if (/^(thin|medium|thick)$/.test(token) || ZERO_NUMBER.test(token) || CSS_DIMENSION.test(token)) width = normalizeZeroLengths('border-top-width', token);
+    else color += (color ? ' ' : '') + token;
+  }
+  color = canonicalizeColor(color, false) || color || 'currentcolor';
+  const expanded = [];
+  for (const side of match[1] ? [match[1]] : ['top', 'right', 'bottom', 'left']) {
+    expanded.push([`border-${side}-width`, deferred ? '' : width], [`border-${side}-style`, deferred ? '' : style], [`border-${side}-color`, deferred ? '' : color]);
+  }
+  return expanded;
 }
 
 export function normalizeComputedLength(property, value) {

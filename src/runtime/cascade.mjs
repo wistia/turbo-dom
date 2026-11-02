@@ -17,7 +17,7 @@
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations, backgroundImage, resolveViewportLength, normalizeComputedLength, normalizeBackgroundImage } from './css-values.mjs';
+import { normalizeZeroLengths, isValidSizingValue, splitDeclarations, backgroundImage, resolveViewportLength, normalizeComputedLength, normalizeBackgroundImage } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -77,7 +77,7 @@ function parseDecls(text, into) {
     const value = decl.slice(c + 1).trim();
     const priority = /\s*!\s*important\s*$/i.exec(value);
     const declaration = priority ? value.slice(0, priority.index).trim() : value;
-    if (!declaration && !name.startsWith('--')) continue;
+    if ((!declaration && !name.startsWith('--')) || !isValidSizingValue(name, declaration)) continue;
     setProp(map, name, declaration, !!priority);
   }
   return map;

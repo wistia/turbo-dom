@@ -12,7 +12,7 @@ import {
 } from './stubs.mjs';
 import { makeGetComputedStyle } from './cascade.mjs';
 import { DOMRect, DOMRectReadOnly } from './geometry.mjs';
-import { CSSStyleSheet, CSSStyleRule } from './cssom.mjs';
+import { CSSStyleSheet, CSSRule, CSSStyleRule, CSSGroupingRule, CSSConditionRule, CSSMediaRule, CSSSupportsRule } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
 import { createCustomElementContext, CustomElementRegistry } from './custom-elements.mjs';
 import { MessageChannel, MessagePort, cloneMessage } from './messaging.mjs';
@@ -606,7 +606,7 @@ const STATIC_BASE = {
   Event, CustomEvent, MessageEvent, ErrorEvent, StorageEvent, PromiseRejectionEvent, DOMRect, DOMRectReadOnly, NodeFilter,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,
   CompositionEvent, WheelEvent, TouchEvent, DragEvent, ProgressEvent, ClipboardEvent,
-  DataTransfer, CSSStyleRule,
+  DataTransfer, CSSRule, CSSStyleRule, CSSGroupingRule, CSSConditionRule, CSSMediaRule, CSSSupportsRule,
   // HTML interfaces inherit Element → `el instanceof HTMLElement` is true.
   // Tag-specific interfaces match by localName via Symbol.hasInstance.
   CustomElementRegistry, SVGElement,

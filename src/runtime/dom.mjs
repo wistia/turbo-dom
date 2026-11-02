@@ -16,7 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations, backgroundImage, normalizeBackgroundImage } from './css-values.mjs';
+import { normalizeZeroLengths, isValidSizingValue, splitDeclarations, backgroundImage, normalizeBackgroundImage } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -1852,8 +1852,11 @@ function makeStyle(el) {
       let val = decl.slice(i + 1).trim();
       if (!prop) continue;
       const m = /\s*!\s*important\s*$/i.exec(val);
-      if (m) { val = val.slice(0, m.index).trim(); prio.set(prop, 'important'); }
-      if (val || prop.startsWith('--')) values.set(prop, val);
+      if (m) val = val.slice(0, m.index).trim();
+      if ((!val && !prop.startsWith('--')) || !isValidSizingValue(prop, val) || (!m && prio.has(prop))) continue;
+      values.set(prop, val);
+      if (m) prio.set(prop, 'important');
+      else prio.delete(prop);
     }
     cachedText = text;
     cachedSerialization = undefined;
@@ -1873,7 +1876,7 @@ function makeStyle(el) {
     get(_t, key) {
       if (key === 'getPropertyValue') return (p) => styleGet(parse().values, p);
       if (key === 'getPropertyPriority') return (p) => parse().prio.get(p) ?? '';
-      if (key === 'setProperty') return (p, v, priority) => { const s = parse(); if (String(v) === '') { s.values.delete(p); s.prio.delete(p); } else { s.values.set(p, String(v)); if (priority) s.prio.set(p, 'important'); else s.prio.delete(p); } write(s); };
+      if (key === 'setProperty') return (p, v, priority) => { if (String(v) !== '' && !isValidSizingValue(p, String(v))) return; const s = parse(); if (String(v) === '') { s.values.delete(p); s.prio.delete(p); } else { s.values.set(p, String(v)); if (priority) s.prio.set(p, 'important'); else s.prio.delete(p); } write(s); };
       if (key === 'removeProperty') return (p) => { const s = parse(); const v = normalizeZeroLengths(p, s.values.get(p) ?? ''); s.values.delete(p); s.prio.delete(p); write(s); return v; };
       if (key === 'item') return (i) => [...parse().values.keys()][i] ?? '';
       if (key === 'length') return parse().values.size;
@@ -1886,6 +1889,7 @@ function makeStyle(el) {
     set(_t, key, value) {
       if (key === 'cssText') { write(parse(String(value))); return true; }
       const s = parse(), property = kebab(key);
+      if (String(value) !== '' && !isValidSizingValue(property, String(value))) return true;
       if (String(value) === '') { s.values.delete(property); s.prio.delete(property); } else s.values.set(property, String(value));
       write(s); return true;
     },
