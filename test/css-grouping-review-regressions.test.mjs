@@ -132,3 +132,84 @@ test('leading comments do not hide grouping rules or their conditions during dir
   assert.ok(sheet.cssRules[0] instanceof window.CSSStyleRule);
   compare('@media/* header */ screen { .a {color:red} }');
 });
+
+test('deleting nested and top-level rules detaches sheet ownership while preserving internal parent links', () => {
+  const oracle = new JSDOM('');
+  const scenario = window => {
+    const sheet = new window.CSSStyleSheet();
+    sheet.insertRule('@media screen { @supports (display:grid) { .a {color:red} } .b {color:blue} }');
+    const media = sheet.cssRules[0], supports = media.cssRules[0], a = supports.cssRules[0], b = media.cssRules[1];
+    media.deleteRule(1);
+    const childLinks = [b.parentRule, b.parentStyleSheet];
+    sheet.deleteRule(0);
+    return [childLinks, media.parentRule, media.parentStyleSheet,
+      supports.parentRule === media, supports.parentStyleSheet, a.parentRule === supports, a.parentStyleSheet];
+  };
+  try { assert.deepEqual(scenario(createEnvironment().window), scenario(oracle.window)); }
+  finally { oracle.window.close(); }
+});
+
+test('detached groups can mutate their retained nested rules without invalidating the former document', () => {
+  const { window, document } = createEnvironment('<style>@media screen { @supports (display:grid) { .a {color:red} } }</style>');
+  const sheet = document.querySelector('style').sheet;
+  const media = sheet.cssRules[0], supports = media.cssRules[0];
+  sheet.deleteRule(0);
+  const version = document.__version;
+  supports.insertRule('.new {color:blue}');
+  media.insertRule('@media print { .other {color:green} }');
+  assert.equal(supports.cssRules[0].parentStyleSheet, null);
+  assert.equal(supports.cssRules[0].parentRule, supports);
+  assert.equal(media.cssRules[0].cssRules[0].parentStyleSheet, null);
+  supports.deleteRule(0);
+  assert.equal(document.__version, version);
+  assert.ok(media instanceof window.CSSGroupingRule);
+});
+
+test('replaceSync detaches and clears old grouping trees like jsdom', () => {
+  const oracle = new JSDOM('');
+  const scenario = window => {
+    const sheet = new window.CSSStyleSheet();
+    sheet.replaceSync('@media screen { @supports (display:grid) { .a {color:red} } } .b {color:blue}');
+    const media = sheet.cssRules[0], supports = media.cssRules[0], a = supports.cssRules[0], b = sheet.cssRules[1];
+    sheet.replaceSync('.new {color:green}');
+    return [media, supports, a, b].map(rule => [rule.parentRule, rule.parentStyleSheet, rule.cssRules?.length ?? 0]);
+  };
+  try { assert.deepEqual(scenario(createEnvironment().window), scenario(oracle.window)); }
+  finally { oracle.window.close(); }
+});
+
+test('font-face rules retain their declaration interface without pretending to be style or grouping rules', () => {
+  const oracle = new JSDOM('');
+  const scenario = window => {
+    const sheet = new window.CSSStyleSheet();
+    sheet.insertRule('@font-face { font-family: "Test"; font-weight:700; font-display:swap; }');
+    const rule = sheet.cssRules[0];
+    return [rule.type, rule instanceof window.CSSFontFaceRule, rule instanceof window.CSSStyleRule,
+      rule instanceof window.CSSGroupingRule, rule.style.getPropertyValue('font-family'), rule.style.getPropertyValue('font-weight')];
+  };
+  try { assert.deepEqual(scenario(createEnvironment().window), scenario(oracle.window)); }
+  finally { oracle.window.close(); }
+  const { window } = createEnvironment();
+  const sheet = new window.CSSStyleSheet();
+  sheet.replaceSync('@supports (display:grid) { @font-face { font-family:Test; src:url("font.woff"); } } @unknown block {}');
+  const font = sheet.cssRules[0].cssRules[0];
+  assert.ok(font instanceof window.CSSFontFaceRule);
+  assert.equal(font.parentRule, sheet.cssRules[0]);
+  assert.equal(font.parentStyleSheet, sheet);
+  assert.equal(font.style.getPropertyValue('src'), 'url("font.woff")');
+  assert.equal(sheet.cssRules[1] instanceof window.CSSFontFaceRule, false);
+  assert.equal(sheet.cssRules[1].style, undefined);
+});
+
+
+test('failed replacement conversion preserves the existing rule tree and ownership', () => {
+  const { window } = createEnvironment();
+  const sheet = new window.CSSStyleSheet();
+  sheet.replaceSync('@media screen {.a{color:red}}');
+  const media = sheet.cssRules[0], rule = media.cssRules[0];
+  assert.throws(() => sheet.replaceSync({ toString() { throw new Error('conversion failed'); } }), /conversion failed/);
+  assert.equal(sheet.cssRules[0], media);
+  assert.equal(media.parentStyleSheet, sheet);
+  assert.equal(rule.parentStyleSheet, sheet);
+  assert.equal(rule.parentRule, media);
+});

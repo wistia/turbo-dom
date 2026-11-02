@@ -128,3 +128,69 @@ test('CSSOM border shorthands expose longhands in declaration order', () => {
     });
   });
 });
+
+test('border width, style and color families expand one through four components in declaration order', () => {
+  compare(window => {
+    const values = [];
+    const declarations = [
+      'border-top:8px solid red; border-width:2px',
+      'border-width:2px; border-top:8px solid red',
+      'border-top-width:8px; border-width:1px 2px',
+      'border-top:8px solid red; border-style:dashed dotted double',
+      'border-top:8px solid red; border-color:blue green red black',
+      'border-width:0 2px 3px 4px; border-left-width:5px',
+      'border-style:solid dashed; border-color:rgb(1, 2, 3) blue',
+      'border-color:var(--border)',
+      'border-color:var(--border, "red blue")',
+      'border-top:8px solid red; border-width:1px 2px 3px 4px 5px',
+      'border-width:1px!important; border-top-width:2px',
+      'border-width:1px; border-top-width:2px!important',
+    ];
+    for (const declaration of declarations) {
+      const sheet = new window.CSSStyleSheet();
+      sheet.insertRule(`.target { ${declaration}; }`);
+      const style = sheet.cssRules[0].style;
+      values.push(['top', 'right', 'bottom', 'left'].flatMap(side => ['width', 'style', 'color'].flatMap(part => {
+        const property = `border-${side}-${part}`;
+        return [style.getPropertyValue(property), style.getPropertyPriority(property)];
+      })));
+    }
+    return values;
+  });
+});
+
+test('CSS-wide border keywords propagate to every affected longhand', () => {
+  compare(window => {
+    const values = [];
+    for (const property of ['border', 'border-top', 'border-width', 'border-style', 'border-color']) {
+      for (const keyword of ['inherit', 'initial', 'unset', 'revert', 'revert-layer']) {
+        const sheet = new window.CSSStyleSheet();
+        sheet.insertRule(`.target { border:1px solid red; ${property}:${keyword}!important; }`);
+        const style = sheet.cssRules[0].style;
+        values.push(['top', 'right', 'bottom', 'left'].flatMap(side => ['width', 'style', 'color'].flatMap(part => {
+          const name = `border-${side}-${part}`;
+          return [style.getPropertyValue(name), style.getPropertyPriority(name)];
+        })));
+      }
+    }
+    return values;
+  });
+});
+
+test('inline sizing comments normalize without joining separate CSS tokens', () => {
+  compare(window => {
+    const style = window.document.createElement('div').style;
+    const values = [];
+    for (const value of ['10px /*hi*/', '10/**/px', '1/**/0px', 'auto/*c*/', '10px/*', 'var(--x,"/* not comment */")', 'var(--x, "a\\"/* literal */")']) {
+      style.width = '20px';
+      style.width = value;
+      values.push(style.width);
+      style.setProperty('width', '20px');
+      style.setProperty('width', value);
+      values.push(style.getPropertyValue('width'));
+    }
+    style.setProperty('--custom', '1 /*preserve*/ 2');
+    values.push(style.getPropertyValue('--custom'));
+    return values;
+  });
+});

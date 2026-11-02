@@ -16,7 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, isValidSizingValue, splitDeclarations, backgroundImage, normalizeBackgroundImage } from './css-values.mjs';
+import { normalizeZeroLengths, stripCssComments, isValidSizingValue, splitDeclarations, backgroundImage, normalizeBackgroundImage } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -1865,7 +1865,7 @@ function makeStyle(el) {
   const serialize = ({ values, prio }) => [...values].map(([k, v]) => `${k}: ${normalizeZeroLengths(k, v)}${prio.get(k) === 'important' ? ' !important' : ''}`).join('; ');
   const write = (style) => {
     for (const [property, value] of style.values) {
-      style.values.set(property, value.trim());
+      style.values.set(property, (property.startsWith('--') ? value : stripCssComments(value)).trim());
     }
     const text = serialize(style);
     el.setAttribute('style', text);

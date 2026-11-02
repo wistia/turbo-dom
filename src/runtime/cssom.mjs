@@ -72,6 +72,13 @@ export class CSSStyleRule extends CSSRule {
   }
 }
 
+const readDeclarationStyle = Object.getOwnPropertyDescriptor(CSSStyleRule.prototype, 'style').get;
+
+export class CSSFontFaceRule extends CSSRule {
+  constructor(cssText) { super(cssText); this.type = 5; }
+  get style() { return readDeclarationStyle.call(this); }
+}
+
 function splitTopLevelRules(css) {
   const out = [];
   let start = 0, depth = 0, quote = '';
@@ -106,6 +113,22 @@ function invalidateSheet(sheet) {
   sheet?.ownerNode?.__touch?.();
 }
 
+function clearSheetLinks(rule) {
+  rule.parentStyleSheet = null;
+  if (rule.cssRules) for (const child of rule.cssRules) clearSheetLinks(child);
+}
+
+function detachRule(rule, clearChildren = false) {
+  rule.parentRule = null;
+  if (clearChildren) {
+    rule.parentStyleSheet = null;
+    if (rule.cssRules) {
+      for (const child of rule.cssRules) detachRule(child, true);
+      rule.cssRules.length = 0;
+    }
+  } else clearSheetLinks(rule);
+}
+
 export class CSSGroupingRule extends CSSRule {
   constructor(prelude, body, sheet = null, parent = null) {
     super();
@@ -125,7 +148,7 @@ export class CSSGroupingRule extends CSSRule {
   }
   deleteRule(index) {
     if (index < 0 || index >= this.cssRules.length) throw new RangeError('deleteRule: index out of bounds');
-    this.cssRules.splice(index, 1);
+    for (const removed of this.cssRules.splice(index, 1)) detachRule(removed);
     invalidateSheet(this.parentStyleSheet);
   }
 }
@@ -177,7 +200,8 @@ function createRule(text, sheet, parent = null) {
     if (name === 'media') Type = CSSMediaRule;
     else if (name === 'supports') Type = CSSSupportsRule;
     rule = new Type(prelude, text.slice(open + 1, text.lastIndexOf('}')), sheet, parent);
-  } else rule = text.trimStart().startsWith('@') ? new CSSRule(text) : new CSSStyleRule(text);
+  } else if (/^@font-face\b/i.test(prelude) && open !== -1) rule = new CSSFontFaceRule(text);
+  else rule = text.trimStart().startsWith('@') ? new CSSRule(text) : new CSSStyleRule(text);
   rule.parentStyleSheet = sheet;
   rule.parentRule = parent;
   return rule;
@@ -210,7 +234,7 @@ export class CSSStyleSheet {
 
   deleteRule(index) {
     if (index < 0 || index >= this.cssRules.length) throw new RangeError('deleteRule: index out of bounds');
-    this.cssRules.splice(index, 1);
+    for (const removed of this.cssRules.splice(index, 1)) detachRule(removed);
     this.#invalidate();
   }
 
@@ -224,7 +248,9 @@ export class CSSStyleSheet {
 
   // constructable-stylesheet API (adoptedStyleSheets); replaceSync is synchronous.
   replaceSync(text) {
-    this.cssRules = splitTopLevelRules(String(text)).map((r) => createRule(r, this));
+    const rules = splitTopLevelRules(String(text)).map((r) => createRule(r, this));
+    for (const rule of this.cssRules) detachRule(rule, true);
+    this.cssRules = rules;
     this.#invalidate();
   }
   replace(text) { this.replaceSync(text); return Promise.resolve(this); }
