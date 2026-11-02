@@ -208,13 +208,6 @@ const SHARED_LAZY = {
   getComputedStyle: () => makeGetComputedStyle(),
   IntersectionObserver: () => IntersectionObserver,
   ResizeObserver: () => ResizeObserver,
-  // rAF: schedule via the LIVE setTimeout (so a render tier that swaps in a timer
-  // queue catches the reschedule) with a non-zero frame delay, and stamp the
-  // callback with the injectable clock now() — a virtual clock that ADVANCES per
-  // frame lets time-gated transitions (MUI Fade/Grow, react-transition-group:
-  // progress = (now-start)/duration) reach progress>=1 and stop rescheduling.
-  requestAnimationFrame: () => (cb) => (globalThis.setTimeout || hostSetTimeout)(() => cb(now()), 16),
-  cancelAnimationFrame: () => (id) => (globalThis.clearTimeout || hostClearTimeout)(id),
   navigator: () => ({
     userAgent: 'Mozilla/5.0 (turbo-dom) AppleWebKit/537.36',
     platform: 'turbo-dom', vendor: '', language: 'en-US', languages: ['en-US'],
@@ -250,6 +243,15 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   let generation = 0;
   let frames;
   let customElements;
+  let animationFrames, disposed = false;
+  const frameState = () => animationFrames ||= { active: true, pending: new Map() };
+  const clearAnimationFrames = () => {
+    if (!animationFrames) return;
+    animationFrames.active = false;
+    for (const [id, cancel] of animationFrames.pending) cancel(id);
+    animationFrames.pending.clear();
+    animationFrames = undefined;
+  };
   const customContext = () => customElements ||= createCustomElementContext(document, HtmlElement, isAncestorActive);
   const receiver = () => document.defaultView || windowProxy;
   let messageListener, messageErrorListener;
@@ -326,6 +328,28 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    requestAnimationFrame: () => {
+      const state = frameState();
+      return callback => {
+        if (typeof callback !== 'function') throw new TypeError('Animation frame callback must be a function');
+        if (!state.active || disposed || (isAncestorActive && !isAncestorActive())) return 0;
+        const schedule = globalThis.setTimeout || hostSetTimeout;
+        const cancel = globalThis.clearTimeout || hostClearTimeout;
+        const id = schedule(() => {
+          if (!state.pending.delete(id) || !state.active || disposed || (isAncestorActive && !isAncestorActive())) return;
+          callback(now());
+        }, 16);
+        state.pending.set(id, cancel);
+        return id;
+      };
+    },
+    cancelAnimationFrame: () => {
+      const state = frameState();
+      return id => {
+        const cancel = state.pending.get(id);
+        if (cancel) { state.pending.delete(id); cancel(id); }
+      };
+    },
     Range: () => {
       function WindowRange() { if (!new.target) throw new TypeError('Range requires new'); return Reflect.construct(Range, [document], new.target); }
       WindowRange.prototype = Object.create(Range.prototype, { constructor: { value: WindowRange, writable: true, configurable: true } });
@@ -453,7 +477,15 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
     globalKeys: [...Object.keys(base), ...Object.keys(STATIC_BASE), ...Object.keys(lazy), ...Object.keys(SHARED_LAZY)],
     // Layer 5: drop materialized global slots, keep the class machinery warm.
     disposeCustomElements() { customElements?.dispose(); customElements = null; },
+    dispose() {
+      customElements?.dispose(); customElements = null;
+      generation++;
+      clearAnimationFrames();
+      disposed = true;
+    },
     resetGlobals() {
+      clearAnimationFrames();
+      disposed = false;
       document.__fragmentRealm = undefined;
       customElements?.dispose(); customElements = null;
       generation++;

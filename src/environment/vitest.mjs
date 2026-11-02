@@ -27,8 +27,8 @@ const environment = {
     const { env, teardown } = installGlobals(global, opts);
     return {
       teardown(g) {
-        teardown();
         env.reset();
+        teardown();
       },
     };
   },

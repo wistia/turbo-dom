@@ -101,6 +101,7 @@ export function createEnvironment(html = '<!doctype html><html><head></head><bod
     // Layer 5: arena-style reset. Re-point at the (re)parsed buffer, drop the
     // owned overlay + node cache + materialized globals. Class machinery stays warm.
     disposeCustomElements: () => win.disposeCustomElements(),
+    dispose: () => win.dispose(),
     reset(nextHtml) {
       if (nextHtml !== undefined) { currentHtml = String(nextHtml); soa = parseBufferCached(currentHtml); }
       win.resetGlobals();
