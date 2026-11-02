@@ -17,7 +17,7 @@
 
 import { matchesSelector } from './selectors.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations, backgroundImage, resolveViewportLength } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations, backgroundImage, resolveViewportLength, normalizeComputedLength, normalizeBackgroundImage } from './css-values.mjs';
 
 const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
@@ -187,7 +187,7 @@ const INHERITED = new Set([
   'color', 'cursor', 'direction', 'font', 'font-family', 'font-size', 'font-style',
   'font-variant', 'font-weight', 'letter-spacing', 'line-height', 'list-style',
   'list-style-type', 'text-align', 'text-indent', 'text-transform', 'visibility',
-  'white-space', 'word-spacing', 'quotes',
+  'white-space', 'word-spacing', 'quotes', 'pointer-events',
 ]);
 
 // Flattened-tree parent for inheritance: the DOM parent, hopping shadow-root→host
@@ -210,12 +210,13 @@ function lookup(map, prop, viewport) {
     const sh = SHORTHAND_OF[prop];
     if (sh) { const s = map.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
   }
-  if (v === undefined) return viewport && prop === 'overflow' ? 'visible' : '';
-  v = normalizeZeroLengths(prop, v);
+  if (v === undefined) return viewport ? prop === 'overflow' ? 'visible' : prop === 'opacity' ? '1' : '' : '';
+  v = normalizeComputedLength(prop, normalizeZeroLengths(prop, v));
   v = resolveViewportLength(prop, v, viewport?.width, viewport?.height);
   // font-family: browsers serialize the list with ", " regardless of source spacing
   // (emotion minifies to "a",b,c). Scoped to font-family so we don't rewrite commas
   // inside rgb()/cubic-bezier() values, which browsers leave compact.
+  if (prop === 'background-image') return normalizeBackgroundImage(v);
   if (prop === 'font-family') return v.replace(/\s*,\s*/g, ', ');
   // <color> properties: browsers serialize computed colors to rgb()/rgba() —
   // names, hex, hsl all canonicalize (includeNamed=true). Unrecognized → passthrough.

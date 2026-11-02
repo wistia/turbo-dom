@@ -24,6 +24,12 @@ export function normalizeZeroLengths(property, value) {
   return trimmed.replace(ZERO_LENGTH, (_, separator) => `${separator}0px`);
 }
 
+export function normalizeComputedLength(property, value) {
+  if (!LENGTH_PROPS.has(property) && property !== 'line-height') return value;
+  const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(px)$/i.exec(value);
+  return match ? `${Number(Number(match[1]).toPrecision(6))}${match[2]}` : value;
+}
+
 export function resolveViewportLength(property, value, width, height) {
   if (property !== 'line-height' && !LENGTH_PROPS.has(property)) return value;
   const match = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(vw|vh|vmin|vmax)$/i.exec(value);
@@ -37,6 +43,37 @@ export function resolveViewportLength(property, value, width, height) {
   }
   const pixels = Number(match[1]) * dimension / 100;
   return Number.isFinite(pixels) ? `${pixels}px` : value;
+}
+
+export function normalizeCssCommas(value) {
+  let out = '', quote = '';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    out += ch;
+    if (ch === '\\') { if (i + 1 < value.length) out += value[++i]; continue; }
+    if (quote) { if (ch === quote) quote = ''; continue; }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === ',') {
+      out += ' ';
+      while (/\s/.test(value[i + 1] || '') && i + 1 < value.length) i++;
+    }
+  }
+  return out;
+}
+
+export function normalizeBackgroundImage(value) {
+  const normalized = value.replace(/url\(\s*(?:"((?:\\[\s\S]|[^"\\])*)"|'((?:\\[\s\S]|[^'\\])*)')\s*\)/gi, (_, double, single) => {
+    const decoded = (double ?? single).replace(/\\([0-9a-fA-F]{1,6}\s?|[\s\S])/g, (_, escape) => {
+      if (/^[0-9a-fA-F]/.test(escape)) {
+        const point = parseInt(escape, 16);
+        return point === 0 || point > 0x10ffff ? '\ufffd' : String.fromCodePoint(point);
+      }
+      return /[\n\r\f]/.test(escape) ? '' : escape;
+    });
+    const escaped = decoded.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\a').replace(/\r/g, '\\d').replace(/\f/g, '\\c');
+    return `url("${escaped}")`;
+  });
+  return normalizeCssCommas(normalized);
 }
 
 export function backgroundImage(value) {

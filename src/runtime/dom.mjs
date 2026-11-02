@@ -16,7 +16,7 @@ import { matchesSelector, querySelector as qsel, querySelectorAll as qselAll } f
 import { serializeInner, serializeOuter } from './html-serialize.mjs';
 import { CSSStyleSheet, styleSheetList } from './cssom.mjs';
 import { COLOR_PROPS, canonicalizeColor } from './color.mjs';
-import { normalizeZeroLengths, splitDeclarations, backgroundImage } from './css-values.mjs';
+import { normalizeZeroLengths, splitDeclarations, backgroundImage, normalizeBackgroundImage } from './css-values.mjs';
 import { SVGAnimatedString, SVGAnimatedLength, SVGAnimatedRect, SVG_LENGTH_ATTRS } from './svg.mjs';
 
 function clearRemovedFocus(node, childrenOnly = false) {
@@ -100,6 +100,44 @@ export class Node extends EventTarget {
     this.parentNode = null;
     this.__idx = -1;              // backing buffer index, or -1 if owned/created
     this.__kids = null;          // owned child array once inflated/promoted
+  }
+
+  get parentNode() { return this.__parentNode; }
+  set parentNode(node) { this.__parentNode = node; }
+  get ownerDocument() { return this.__ownerDocument; }
+  set ownerDocument(document) { this.__ownerDocument = document; }
+  get nodeType() {
+    if (this instanceof Element) return ELEMENT_NODE;
+    if (this instanceof Document) return DOCUMENT_NODE;
+    if (this instanceof DocumentFragment) return DOCUMENT_FRAGMENT_NODE;
+    if (this instanceof Text) return TEXT_NODE;
+    if (this instanceof Comment) return COMMENT_NODE;
+    if (this instanceof DocumentType) return DOCUMENT_TYPE_NODE;
+    if (!(this instanceof Node)) throw new TypeError('Illegal invocation');
+    return 0;
+  }
+  get nodeName() {
+    if (this instanceof Element) return this.tagName;
+    if (this instanceof Document) return '#document';
+    if (this instanceof DocumentFragment) return '#document-fragment';
+    if (this instanceof Text) return '#text';
+    if (this instanceof Comment) return '#comment';
+    if (this instanceof DocumentType) return this.name;
+    if (!(this instanceof Node)) throw new TypeError('Illegal invocation');
+    return '';
+  }
+  isEqualNode(other) {
+    if (!other || this.nodeType !== other.nodeType || this.nodeName !== other.nodeName) return false;
+    if (this.nodeType === TEXT_NODE || this.nodeType === COMMENT_NODE) return this.data === other.data;
+    if (this.nodeType === DOCUMENT_TYPE_NODE && (this.publicId !== other.publicId || this.systemId !== other.systemId)) return false;
+    if (this.nodeType === ELEMENT_NODE) {
+      if (this.namespaceURI !== other.namespaceURI || this.getAttributeNames().length !== other.getAttributeNames().length) return false;
+      for (const name of this.getAttributeNames()) if (this.getAttribute(name) !== other.getAttribute(name)) return false;
+    }
+    const children = this.__children(), otherChildren = other.childNodes;
+    if (children.length !== otherChildren.length) return false;
+    for (let i = 0; i < children.length; i++) if (!children[i].isEqualNode(otherChildren[i])) return false;
+    return true;
   }
 
   // Lazy inflation: walk the SoA buffer's firstChild/nextSib for this node, build
@@ -266,7 +304,7 @@ export class Node extends EventTarget {
       const kids = this.__children();
       let css = '';
       for (let i = 0; i < kids.length; i++) if (kids[i].nodeType === TEXT_NODE) css += kids[i].data;
-      for (let i = 0; i < sheet.cssRules.length; i++) css += (css ? '\n' : '') + sheet.cssRules[i].cssText;
+      for (let i = 0; i < sheet.cssRules.length; i++) if (!sheet.cssRules[i].__fromText) css += (css ? '\n' : '') + sheet.cssRules[i].cssText;
       return css;
     }
     const kids = this.__children();
@@ -320,7 +358,7 @@ export class Node extends EventTarget {
 
 // nodeType + document-position constants on the prototype, so `node.TEXT_NODE`
 // works on instances (dom-accessibility-api and others read them off the node).
-Object.assign(Node.prototype, {
+const NODE_CONSTANTS = {
   ELEMENT_NODE: 1, ATTRIBUTE_NODE: 2, TEXT_NODE: 3, CDATA_SECTION_NODE: 4,
   ENTITY_REFERENCE_NODE: 5, ENTITY_NODE: 6, PROCESSING_INSTRUCTION_NODE: 7,
   COMMENT_NODE: 8, DOCUMENT_NODE: 9, DOCUMENT_TYPE_NODE: 10,
@@ -328,7 +366,11 @@ Object.assign(Node.prototype, {
   DOCUMENT_POSITION_DISCONNECTED: 1, DOCUMENT_POSITION_PRECEDING: 2,
   DOCUMENT_POSITION_FOLLOWING: 4, DOCUMENT_POSITION_CONTAINS: 8,
   DOCUMENT_POSITION_CONTAINED_BY: 16, DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC: 32,
-});
+};
+for (const [name, value] of Object.entries(NODE_CONSTANTS)) {
+  Object.defineProperty(Node, name, { value, enumerable: true });
+  Object.defineProperty(Node.prototype, name, { value, enumerable: true });
+}
 
 // Viable next sibling (DOM spec): the first following sibling that is NOT itself
 // one of the nodes being inserted. Anchoring after()/replaceWith() on the raw
@@ -413,6 +455,7 @@ class ClassList {
   get length() { return this.__list().length; }
   item(i) { return this.__list()[i] ?? null; }
   get value() { return this.__el.getAttribute('class') || ''; }
+  set value(value) { this.__el.setAttribute('class', String(value)); }
   toString() { return this.value; }
   [Symbol.iterator]() { return this.__list()[Symbol.iterator](); }
 }
@@ -440,10 +483,11 @@ export class Element extends Node {
   }
 
   get content() {
+    if (this.localName === 'meta' && this.__ns === '') return this.getAttribute('content') || '';
     if (this.__content === undefined) this.__content = new DocumentFragment(this.ownerDocument.__templateContentsOwner());
     return this.__content;
   }
-  set content(value) { this.__content = value; }
+  set content(value) { if (this.localName === 'meta' && this.__ns === '') this.setAttribute('content', value); else this.__content = value; }
 
   get nodeType() { return ELEMENT_NODE; }
   get tagName() { return this.__ns === '' ? this.localName.toUpperCase() : this.localName; }
@@ -566,7 +610,16 @@ export class Element extends Node {
   // this.__sheet. Non-<style> elements have no sheet (null), matching the platform.
   get sheet() {
     if (this.localName !== 'style') return null;
-    return this.__sheet ?? (this.__sheet = new CSSStyleSheet(this));
+    const text = this.__children().map(child => child.textContent).join('');
+    if (!this.__sheet || this.__sheetText !== text) {
+      this.__sheet = new CSSStyleSheet(this);
+      this.__sheetText = text;
+      if (text) {
+        this.__sheet.replaceSync(text);
+        for (const rule of this.__sheet.cssRules) rule.__fromText = true;
+      }
+    }
+    return this.__sheet;
   }
 
   // ---- form-control properties (on the prototype so libraries that read
@@ -626,8 +679,19 @@ export class Element extends Node {
   get selectionDirection() { return this.__selDir ?? 'none'; }
   set selectionDirection(v) { this.__selDir = v; }
   setSelectionRange(s, e, dir = 'none') { this.__selStart = s; this.__selEnd = e; this.__selDir = dir; }
-  setRangeText(repl, start = this.__selStart ?? 0, end = this.__selEnd ?? 0) {
-    const v = this.value ?? ''; this.value = v.slice(0, start) + repl + v.slice(end);
+  setRangeText(replacement, start = this.__selStart ?? 0, end = this.__selEnd ?? 0, mode = 'preserve') {
+    const value = this.value ?? '';
+    start = Math.min(Number(start) >>> 0, value.length); end = Math.min(Number(end) >>> 0, value.length);
+    if (start > end) throw new DOMException('Start exceeds end', 'IndexSizeError');
+    replacement = String(replacement);
+    const selectionStart = this.selectionStart ?? 0, selectionEnd = this.selectionEnd ?? 0;
+    setElementValue.call(this, value.slice(0, start) + replacement + value.slice(end));
+    const after = start + replacement.length, delta = replacement.length - (end - start);
+    if (mode === 'select') this.setSelectionRange(start, after);
+    else if (mode === 'start') this.setSelectionRange(start, start);
+    else if (mode === 'end') this.setSelectionRange(after, after);
+    else this.setSelectionRange(selectionStart > end ? selectionStart + delta : selectionStart > start ? start : selectionStart,
+      selectionEnd > end ? selectionEnd + delta : selectionEnd > start ? after : selectionEnd);
   }
   select() { this.__selStart = 0; this.__selEnd = (this.value ?? '').length; }
 
@@ -680,6 +744,7 @@ export class Element extends Node {
   get rowSpan() { const v = parseInt(this.getAttribute('rowspan'), 10); return v > 0 ? v : 1; }
   set rowSpan(x) { this.setAttribute('rowspan', String(x)); }
   get href() { return this.getAttribute('href') ?? ''; }
+  get pathname() { try { return new URL(this.href, this.ownerDocument.baseURI).pathname; } catch { return ''; } }
   set href(x) { this.setAttribute('href', x); }
   get download() { return this.getAttribute('download') ?? ''; }
   set download(x) { this.setAttribute('download', x); }
@@ -719,8 +784,6 @@ export class Element extends Node {
   }
   get defaultSelected() { return this.hasAttribute('selected'); }
   set defaultSelected(value) { if (value) this.setAttribute('selected', ''); else this.removeAttribute('selected'); }
-  get text() { return this.localName === 'option' ? this.textContent.replace(/[\t\n\f\r ]+/g, ' ').replace(/^ | $/g, '') : this.textContent; }
-  set text(v) { this.textContent = v; }
 
   // select
   get options() { return this.localName === 'select' ? this.getElementsByTagName('option') : undefined; }
@@ -857,14 +920,14 @@ export class Element extends Node {
     // WHATWG "click in progress" flag: a nested .click() on the same element
     // (e.g. a parent onClick that re-clicks this element on the bubble path) is
     // a no-op, which breaks the otherwise-infinite re-entrancy.
-    if (this.__clickInProgress) return;
+    if (this.__clickInProgress || (this.disabled && /^(input|button|select|textarea|option|optgroup|fieldset)$/.test(this.localName))) return;
     this.__clickInProgress = true;
     try { this.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })); }
     finally { this.__clickInProgress = false; }
   }
   // pre-click activation (runs BEFORE click listeners; undone if preventDefault)
   __preClickActivation() {
-    if (this.localName !== 'input' || this.disabled) return null;
+    if (this.localName !== 'input') return null;
     const t = (this.getAttribute('type') || 'text').toLowerCase();
     // Write the internal field directly — NOT via the `checked` setter, which
     // React wraps with its value-tracker. Going through the setter would update
@@ -893,6 +956,18 @@ export class Element extends Node {
       .filter((i) => i.localName === 'input' && (i.getAttribute('type') || '').toLowerCase() === 'radio' && i.getAttribute('name') === name);
   }
 
+  get open() { return this.hasAttribute('open'); }
+  set open(value) {
+    const previous = this.open;
+    this.toggleAttribute('open', Boolean(value));
+    if (this.localName === 'details' && previous !== this.open) {
+      if (!this.__togglePending) {
+        this.__togglePending = true;
+        Promise.resolve().then(() => { this.__togglePending = false; this.dispatchEvent(new Event('toggle')); });
+      }
+    }
+  }
+
   // default actions applied post-dispatch when not preventDefault'd
   __runDefaultAction(e) {
     if (e.type !== 'click') return;
@@ -901,6 +976,8 @@ export class Element extends Node {
       const t = (this.getAttribute('type') || (this.localName === 'button' ? 'submit' : 'text')).toLowerCase();
       if (t === 'submit') this.form?.requestSubmit();
       else if (t === 'reset') this.form?.reset();
+    } else if (this.localName === 'summary' && this.parentNode?.localName === 'details') {
+      this.parentNode.open = !this.parentNode.open;
     } else if (this.localName === 'label') {
       const c = this.control;
       if (c && c !== e.target) c.click();
@@ -987,7 +1064,6 @@ export class Element extends Node {
 
   // pointer capture + animation playback (no-op honest stubs)
   setPointerCapture() {} releasePointerCapture() {} hasPointerCapture() { return false; }
-  animate() { return { play() {}, pause() {}, cancel() {}, finish() {}, finished: Promise.resolve(), onfinish: null, cancel_: null }; }
   requestFullscreen() { return Promise.resolve(); }
 
   // canvas (no raster backend — honest no-op context)
@@ -1083,6 +1159,25 @@ export class Element extends Node {
 }
 
 
+export class HTMLElement extends Element {}
+for (const name of ['focus', 'blur']) Object.defineProperty(HTMLElement.prototype, name, Object.getOwnPropertyDescriptor(Element.prototype, name));
+export class HTMLInputElement extends HTMLElement {}
+export class HTMLTextAreaElement extends HTMLElement {}
+export class HTMLSelectElement extends HTMLElement {}
+for (const Type of [HTMLInputElement, HTMLTextAreaElement]) {
+  for (const name of ['value', 'checked', 'setSelectionRange', 'setRangeText', 'select', 'selectionStart', 'selectionEnd', 'selectionDirection']) {
+    Object.defineProperty(Type.prototype, name, Object.getOwnPropertyDescriptor(Element.prototype, name));
+  }
+}
+Object.defineProperty(HTMLSelectElement.prototype, 'value', Object.getOwnPropertyDescriptor(Element.prototype, 'value'));
+
+class HTMLTextElement extends HTMLElement {
+  get text() { return this.localName === 'option' ? this.textContent.replace(/[\t\n\f\r ]+/g, ' ').replace(/^ | $/g, '') : this.textContent; }
+  set text(v) { this.textContent = v; }
+}
+
+const setElementValue = Object.getOwnPropertyDescriptor(Element.prototype, 'value').set;
+
 function canvasDimension(element, name, fallback) {
   const match = /^[\t\n\f\r ]*\+?(\d+)/.exec(element.getAttribute(name) || '');
   const dimension = match ? Number(match[1]) : NaN;
@@ -1094,12 +1189,15 @@ function setCanvasDimension(element, name, value, fallback) {
   element.setAttribute(name, dimension <= 0x7fffffff ? dimension : fallback);
 }
 
-export class CanvasElement extends Element {
+class HTMLCanvasElement extends HTMLElement {
   get width() { return canvasDimension(this, 'width', 300); }
   set width(value) { setCanvasDimension(this, 'width', value, 300); }
   get height() { return canvasDimension(this, 'height', 150); }
   set height(value) { setCanvasDimension(this, 'height', value, 150); }
 }
+
+const CanvasElement = HTMLCanvasElement;
+export { CanvasElement };
 
 function mediaNumber(value) {
   const number = +value;
@@ -1116,8 +1214,14 @@ export const MEDIA_CONSTANTS = Object.freeze({
   HAVE_NOTHING: 0, HAVE_METADATA: 1, HAVE_CURRENT_DATA: 2, HAVE_FUTURE_DATA: 3, HAVE_ENOUGH_DATA: 4,
 });
 
+const EMPTY_TIME_RANGES = Object.freeze({
+  length: 0,
+  start() { throw new DOMException('Time range index is out of bounds', 'IndexSizeError'); },
+  end() { throw new DOMException('Time range index is out of bounds', 'IndexSizeError'); },
+});
+
 // Virtual controls only: no decoding, resource fetching, or automatic time advancement.
-export class MediaElement extends Element {
+class HTMLMediaElement extends HTMLElement {
   get paused() { return this.__mediaPaused ?? true; }
   get ended() { return false; }
   get readyState() { return 0; }
@@ -1143,6 +1247,11 @@ export class MediaElement extends Element {
   }
   get defaultMuted() { return this.hasAttribute('muted'); }
   set defaultMuted(value) { if (value) this.setAttribute('muted', ''); else this.removeAttribute('muted'); }
+  get buffered() { return EMPTY_TIME_RANGES; }
+  get seekable() { return EMPTY_TIME_RANGES; }
+  get played() { return EMPTY_TIME_RANGES; }
+  get crossOrigin() { return this.getAttribute('crossorigin'); }
+  set crossOrigin(value) { if (value == null) this.removeAttribute('crossorigin'); else this.setAttribute('crossorigin', value); }
   get preload() { return this.getAttribute('preload') ?? ''; }
   set preload(value) { this.setAttribute('preload', value); }
   play() {
@@ -1160,6 +1269,9 @@ export class MediaElement extends Element {
   }
   canPlayType() { return ''; }
 }
+
+const MediaElement = HTMLMediaElement;
+export { MediaElement };
 
 for (const [name, value] of Object.entries(MEDIA_CONSTANTS)) {
   Object.defineProperty(MediaElement, name, { value, enumerable: true });
@@ -1203,9 +1315,13 @@ for (const attr of SVG_LENGTH_ATTRS) {
 // every construction site (buffer inflation, innerHTML, cloneNode, createElementNS) agrees.
 function newElement(doc, tag, ns) {
   if (ns === 'svg') return new SVGElement(doc, tag, ns);
+  if (ns === '' && tag === 'input') return new HTMLInputElement(doc, tag, ns);
+  if (ns === '' && tag === 'textarea') return new HTMLTextAreaElement(doc, tag, ns);
+  if (ns === '' && tag === 'select') return new HTMLSelectElement(doc, tag, ns);
   if (ns === '' && tag === 'canvas') return new CanvasElement(doc, tag, ns);
   if (ns === '' && (tag === 'audio' || tag === 'video')) return new MediaElement(doc, tag, ns);
-  return new Element(doc, tag, ns);
+  if (ns === '' && (tag === 'option' || tag === 'a' || tag === 'script' || tag === 'title')) return new HTMLTextElement(doc, tag, ns);
+  return ns === '' ? new HTMLElement(doc, tag, ns) : new Element(doc, tag, ns);
 }
 
 
@@ -1244,6 +1360,16 @@ export class ShadowRoot extends DocumentFragment {
     this.__isShadowRoot = true;
   }
   get nodeName() { return '#document-fragment'; }
+  get activeElement() {
+    let active = this.ownerDocument.__active;
+    while (active) {
+      const root = active.getRootNode();
+      if (root === this) return active;
+      if (!root.__isShadowRoot) return null;
+      active = root.host;
+    }
+    return null;
+  }
   get innerHTML() { return serializeInner(this); }
   set innerHTML(html) {
     const frag = getParser().parseFragment(String(html), ''); // empty context → body
@@ -1284,7 +1410,6 @@ export class ShadowRoot extends DocumentFragment {
     return liveHTMLCollection(() => { const d = self.ownerDocument, v = d ? (d.__version || 0) : 0; if (v === cv) return ca; cv = v; return (ca = collectByClass(self, classes)); });
   }
   // the topmost root of any node within is this shadow root, never the document
-  get activeElement() { return null; }
 }
 
 // ------------------------------------------------------------ helpers ----
@@ -1373,6 +1498,7 @@ const CHAR_W = 8;
 function viewportWidth(el) { const w = el.ownerDocument && el.ownerDocument.defaultView; return (w && w.innerWidth) || 1024; }
 function synthWidth(el) {
   const doc = el.ownerDocument || el;
+  if (doc.__geometry === 'zero') return 0;
   const v = doc.__version || 0;
   const c = el.__rw;
   if (c && c.v === v) return c.w;
@@ -1387,6 +1513,7 @@ function synthWidth(el) {
 }
 function synthHeight(el) {
   const doc = el.ownerDocument || el;
+  if (doc.__geometry === 'zero') return 0;
   const v = doc.__version || 0;
   const c = el.__rh;
   if (c && c.v === v) return c.h;
@@ -1414,7 +1541,18 @@ function nodeIndex(node) {
 // Range — functional DOM Range. Tree-mutating ops (extract/clone/delete/insert/
 // surround) implement the common case (a single container with element/text
 // children, offsets as child indices). Zero geometry (no layout).
-class Range {
+function compareBoundaryPoints(a, offsetA, b, offsetB) {
+  if (a === b) return Math.sign(offsetA - offsetB);
+  if (a.contains(b)) {
+    let child = b;
+    while (child.parentNode !== a) child = child.parentNode;
+    return nodeIndex(child) < offsetA ? 1 : -1;
+  }
+  if (b.contains(a)) return -compareBoundaryPoints(b, offsetB, a, offsetA);
+  return a.compareDocumentPosition(b) & 4 ? -1 : 1;
+}
+
+export class Range {
   constructor(doc) {
     this.__doc = doc;
     this.startContainer = doc; this.endContainer = doc;
@@ -1438,6 +1576,19 @@ class Range {
       container = container.parentNode;
     }
     return container || this.startContainer;
+  }
+  comparePoint(node, offset) {
+    if (node.getRootNode() !== this.startContainer.getRootNode()) throw new DOMException('Point is in a different tree', 'WrongDocumentError');
+    if (node.nodeType === DOCUMENT_TYPE_NODE) throw new DOMException('DocumentType cannot contain a boundary', 'InvalidNodeTypeError');
+    offset = Number(offset) >>> 0;
+    const length = node.nodeType === TEXT_NODE || node.nodeType === COMMENT_NODE ? node.length : node.__children().length;
+    if (offset > length) throw new DOMException('Offset exceeds node length', 'IndexSizeError');
+    if (compareBoundaryPoints(node, offset, this.startContainer, this.startOffset) < 0) return -1;
+    return compareBoundaryPoints(node, offset, this.endContainer, this.endOffset) > 0 ? 1 : 0;
+  }
+  isPointInRange(node, offset) {
+    if (node.getRootNode() !== this.startContainer.getRootNode()) return false;
+    return this.comparePoint(node, offset) === 0;
   }
   cloneRange() { const r = new Range(this.__doc); r.startContainer = this.startContainer; r.endContainer = this.endContainer; r.startOffset = this.startOffset; r.endOffset = this.endOffset; r.collapsed = this.collapsed; return r; }
   // The common single-container case: start === end container, offsets are child
@@ -1544,7 +1695,20 @@ class TreeWalker {
     (function walk(n) { for (const c of (n.__children ? n.__children() : [])) { out.push(c); walk(c); } })(this.root);
     return out.filter((n) => this.__show(n) === 1);
   }
-  nextNode() { const all = this.__flat(); const i = all.indexOf(this.currentNode); const next = all[i + 1] ?? (this.currentNode === this.root ? all[0] : null); this.currentNode = next; this.referenceNode = next; return next ?? null; }
+  nextNode() {
+    let node = this.currentNode, descend = true;
+    for (;;) {
+      if (descend && node.firstChild) node = node.firstChild;
+      else {
+        while (node && node !== this.root && !node.nextSibling) node = node.parentNode;
+        if (!node || node === this.root) return null;
+        node = node.nextSibling;
+      }
+      const result = this.__show(node);
+      if (result === 1) { this.currentNode = node; this.referenceNode = node; return node; }
+      descend = result !== 2;
+    }
+  }
   previousNode() { const all = this.__flat(); const i = all.indexOf(this.currentNode); const prev = i > 0 ? all[i - 1] : null; if (prev) { this.currentNode = prev; this.referenceNode = prev; } return prev ?? null; }
   firstChild() { const k = (this.currentNode.__children ? this.currentNode.__children() : []).filter((n) => this.__show(n) === 1); if (k[0]) { this.currentNode = k[0]; return k[0]; } return null; }
   lastChild() { const k = (this.currentNode.__children ? this.currentNode.__children() : []).filter((n) => this.__show(n) === 1); const last = k[k.length - 1]; if (last) { this.currentNode = last; return last; } return null; }
@@ -1552,6 +1716,68 @@ class TreeWalker {
   nextSibling() { let n = this.currentNode.nextSibling; while (n && this.__show(n) !== 1) n = n.nextSibling; if (n) this.currentNode = n; return n ?? null; }
   previousSibling() { let n = this.currentNode.previousSibling; while (n && this.__show(n) !== 1) n = n.previousSibling; if (n) this.currentNode = n; return n ?? null; }
   detach() {}
+}
+
+function followingNode(node, root) {
+  if (node.firstChild) return node.firstChild;
+  while (node && node !== root) {
+    if (node.nextSibling) return node.nextSibling;
+    node = node.parentNode;
+  }
+  return null;
+}
+class NodeIterator extends TreeWalker {
+  previousNode() {
+    let node = this.referenceNode;
+    const preceding = current => {
+      if (current === this.root) return null;
+      if (!current.previousSibling) return current.parentNode;
+      current = current.previousSibling;
+      while (current.lastChild) current = current.lastChild;
+      return current;
+    };
+    if (!this.root.contains(node)) node = this.__predecessors?.find(candidate => this.root.contains(candidate)) || null;
+    else if (this.pointerBeforeReferenceNode) node = preceding(node);
+    while (node) {
+      if (this.__show(node) === 1) {
+        this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = true;
+        return node;
+      }
+      node = preceding(node);
+    }
+    return null;
+  }
+  nextNode() {
+    let node;
+    if (!this.root.contains(this.referenceNode)) node = this.__successors?.find(candidate => this.root.contains(candidate)) || null;
+    else if (this.pointerBeforeReferenceNode) node = this.referenceNode;
+    else node = followingNode(this.referenceNode, this.root);
+    while (node) {
+      if (this.__show(node) === 1) {
+        this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = false;
+        const predecessors = [];
+        let previous = node;
+        while (previous && previous !== this.root) {
+          let sibling = previous.previousSibling;
+          if (sibling) { while (sibling.lastChild) sibling = sibling.lastChild; predecessors.push(sibling); }
+          previous = previous.parentNode;
+          if (previous) predecessors.push(previous);
+        }
+        this.__predecessors = predecessors;
+        const successors = [];
+        if (node.firstChild) successors.push(node.firstChild);
+        let ancestor = node;
+        while (ancestor && ancestor !== this.root) {
+          if (ancestor.nextSibling) successors.push(ancestor.nextSibling);
+          ancestor = ancestor.parentNode;
+        }
+        this.__successors = successors;
+        return node;
+      }
+      node = followingNode(node, this.root);
+    }
+    return null;
+  }
 }
 
 // DOMParser — parses a string into a real Document via the native parser.
@@ -1589,7 +1815,7 @@ function makeStyle(el) {
       if (!prop) continue;
       const m = /\s*!\s*important\s*$/i.exec(val);
       if (m) { val = val.slice(0, m.index).trim(); prio.set(prop, 'important'); }
-      values.set(prop, val);
+      if (val || prop.startsWith('--')) values.set(prop, val);
     }
     cachedText = text;
     cachedSerialization = undefined;
@@ -1609,7 +1835,7 @@ function makeStyle(el) {
     get(_t, key) {
       if (key === 'getPropertyValue') return (p) => styleGet(parse().values, p);
       if (key === 'getPropertyPriority') return (p) => parse().prio.get(p) ?? '';
-      if (key === 'setProperty') return (p, v, priority) => { const s = parse(); s.values.set(p, String(v)); if (priority) s.prio.set(p, 'important'); else s.prio.delete(p); write(s); };
+      if (key === 'setProperty') return (p, v, priority) => { const s = parse(); if (String(v) === '') { s.values.delete(p); s.prio.delete(p); } else { s.values.set(p, String(v)); if (priority) s.prio.set(p, 'important'); else s.prio.delete(p); } write(s); };
       if (key === 'removeProperty') return (p) => { const s = parse(); const v = normalizeZeroLengths(p, s.values.get(p) ?? ''); s.values.delete(p); s.prio.delete(p); write(s); return v; };
       if (key === 'item') return (i) => [...parse().values.keys()][i] ?? '';
       if (key === 'length') return parse().values.size;
@@ -1621,12 +1847,14 @@ function makeStyle(el) {
     },
     set(_t, key, value) {
       if (key === 'cssText') { write(parse(String(value))); return true; }
-      const s = parse(); s.values.set(kebab(key), String(value)); write(s); return true;
+      const s = parse(), property = kebab(key);
+      if (String(value) === '') { s.values.delete(property); s.prio.delete(property); } else s.values.set(property, String(value));
+      write(s); return true;
     },
     has(_t, key) { return typeof key === 'string'; },
   });
 }
-const kebab = (s) => s.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
+const kebab = (s) => s.replace(/^webkit(?=[A-Z])/, 'Webkit').replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 
 // We store inline styles verbatim (no shorthand expansion). For the common case
 // `style.background='red'; style.backgroundColor` we let a longhand READ fall back
@@ -1646,6 +1874,7 @@ function styleGet(values, prop) {
     if (sh) { const s = values.get(sh); if (s !== undefined && !/\s/.test(s.trim())) v = s; }
   }
   if (v === undefined) return '';
+  if (prop === 'background-image') return normalizeBackgroundImage(v);
   v = normalizeZeroLengths(prop, v);
   // Inline CSSOM canonicalizes <color> values the way a browser does on read-back:
   // hex/rgb()/hsl() → rgb()/rgba(), but NAMED keywords stay as authored (includeNamed
@@ -1838,7 +2067,11 @@ export class Document extends Node {
     this.__mo = null;             // registered MutationObservers (lazy — most files never observe())
     this.__moPending = null;      // observers with queued records awaiting microtask
   }
-  get nodeType() { return DOCUMENT_NODE; }
+  get nodeType() {
+    if (this instanceof Document) return DOCUMENT_NODE;
+    if (this instanceof Node) return this.nodeType;
+    throw new TypeError('Illegal invocation');
+  }
   get nodeName() { return '#document'; }
 
   // ---- MutationObserver registry ----
@@ -1950,8 +2183,12 @@ export class Document extends Node {
   get doctype() { return this.__children().find((n) => n.nodeType === DOCUMENT_TYPE_NODE) ?? null; }
   get head() { const html = this.documentElement; return html ? html.__children().find((n) => n.localName === 'head') ?? null : null; }
   get body() { const html = this.documentElement; return html ? html.__children().find((n) => n.localName === 'body') ?? null : null; }
-  get activeElement() { return this.__active || this.body || null; }
-  __setActive(el) { this.__active = el; }
+  get activeElement() {
+    let active = this.__active;
+    while (active?.getRootNode().__isShadowRoot) active = active.getRootNode().host;
+    return active || this.body || null;
+  }
+  __setActive(el) { this.__active = el; this.__touch(); }
 
   // Live StyleSheetList. emotion iterates this to find its own <style>'s sheet by
   // ownerNode. Touching `.sheet` here lazily creates a CSSStyleSheet per <style>
@@ -2014,7 +2251,7 @@ export class Document extends Node {
 
   // TreeWalker / NodeIterator (whatToShow: 1 elements, 4 text, 0xFFFFFFFF all)
   createTreeWalker(root, whatToShow = 0xffffffff, filter = null) { return new TreeWalker(root, whatToShow, filter); }
-  createNodeIterator(root, whatToShow = 0xffffffff, filter = null) { return new TreeWalker(root, whatToShow, filter); }
+  createNodeIterator(root, whatToShow = 0xffffffff, filter = null) { return new NodeIterator(root, whatToShow, filter); }
 
   getElementsByName(name) {
     const self = this; return liveHTMLCollection(() => collectByTag(self, '*').filter((e) => e.getAttribute('name') === name));

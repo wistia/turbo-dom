@@ -291,7 +291,8 @@ let style = cascade::computed_style(&dom.tree, cards[0]);   // partial honest ca
 
 ## Limitations (by design)
 
-- **No layout.** `getBoundingClientRect()` returns zeros; `getClientRects()` is empty.
+- **No layout engine.** Geometry defaults to synthetic sizes. Use `createEnvironment(html, { geometry: 'zero' })` (or Vitest `environmentOptions.turboDom.geometry`) for jsdom-style zero sizes and empty client rects. The option survives reset and applies to child frames.
+- **Web Animations API is unsupported.** `Element.animate` is absent so animation libraries can detect this and use their JavaScript fallback.
 - **`getComputedStyle` is a partial cascade** — it resolves REAL injected `<style>` rules
   (emotion/MUI `.css-HASH{…}`) plus inline `style`, applying specificity and source order
   (inline wins). It **inherits the standard inheritable properties** (`color`, `font*`,

@@ -92,18 +92,28 @@ const TYPED_DEFAULTS = {
   WheelEvent: { ...MOUSE_DEFAULTS, deltaX: 0, deltaY: 0, deltaZ: 0, deltaMode: 0 },
   TouchEvent: { ...UI_DEFAULTS, ...MODIFIER_DEFAULTS, touches: [], targetTouches: [], changedTouches: [] },
   DragEvent: { ...MOUSE_DEFAULTS, dataTransfer: null },
+  ErrorEvent: { message: '', filename: '', lineno: 0, colno: 0, error: null },
+  StorageEvent: { key: null, oldValue: null, newValue: null, url: '', storageArea: null },
+  PromiseRejectionEvent: { promise: null, reason: undefined },
   ProgressEvent: { lengthComputable: false, loaded: 0, total: 0 },
 };
 
-function makeTyped(name) {
+function makeTyped(name, Parent = Event, inheritedName) {
   const defaults = TYPED_DEFAULTS[name];
-  const fields = Object.keys(defaults);
-  const cls = class extends Event {
+  const fields = Object.keys(defaults).filter(field => !inheritedName || !(field in TYPED_DEFAULTS[inheritedName]));
+  const cls = class extends Parent {
     constructor(type, init = {}) {
       super(type, init);
       for (const field of fields) {
         const value = init[field];
-        this[field] = value === undefined ? defaults[field] : value;
+        let converted = value === undefined ? defaults[field] : value;
+        if (name === 'ErrorEvent') {
+          if (field === 'message' || field === 'filename') converted = `${converted}`;
+          else if (field === 'lineno' || field === 'colno') converted = Number(converted) >>> 0;
+        } else if (name === 'StorageEvent') {
+          if (field === 'url' || ((field === 'key' || field === 'oldValue' || field === 'newValue') && converted != null)) converted = `${converted}`;
+        }
+        this[field] = converted;
       }
     }
   };
@@ -117,16 +127,28 @@ function makeTyped(name) {
 }
 
 export const UIEvent = makeTyped('UIEvent');
-export const MouseEvent = makeTyped('MouseEvent');
-export const PointerEvent = makeTyped('PointerEvent');
-export const KeyboardEvent = makeTyped('KeyboardEvent');
-export const InputEvent = makeTyped('InputEvent');
-export const FocusEvent = makeTyped('FocusEvent');
-export const CompositionEvent = makeTyped('CompositionEvent');
-export const WheelEvent = makeTyped('WheelEvent');
-export const TouchEvent = makeTyped('TouchEvent');
-export const DragEvent = makeTyped('DragEvent');
+export const MouseEvent = makeTyped('MouseEvent', UIEvent, 'UIEvent');
+export const PointerEvent = makeTyped('PointerEvent', MouseEvent, 'MouseEvent');
+export const KeyboardEvent = makeTyped('KeyboardEvent', UIEvent, 'UIEvent');
+export const InputEvent = makeTyped('InputEvent', UIEvent, 'UIEvent');
+export const FocusEvent = makeTyped('FocusEvent', UIEvent, 'UIEvent');
+export const CompositionEvent = makeTyped('CompositionEvent', UIEvent, 'UIEvent');
+export const WheelEvent = makeTyped('WheelEvent', MouseEvent, 'MouseEvent');
+export const TouchEvent = makeTyped('TouchEvent', UIEvent, 'UIEvent');
+export const DragEvent = makeTyped('DragEvent', MouseEvent, 'MouseEvent');
+export const ErrorEvent = makeTyped('ErrorEvent');
+export const StorageEvent = makeTyped('StorageEvent');
+export const PromiseRejectionEvent = makeTyped('PromiseRejectionEvent');
 export const ProgressEvent = makeTyped('ProgressEvent');
+
+Object.defineProperties(MouseEvent.prototype, {
+  x: { get() { return this.clientX; }, configurable: true },
+  y: { get() { return this.clientY; }, configurable: true },
+  pageX: { get() { return this.clientX + (this.view?.scrollX || this.target?.ownerDocument?.defaultView?.scrollX || 0); }, configurable: true },
+  pageY: { get() { return this.clientY + (this.view?.scrollY || this.target?.ownerDocument?.defaultView?.scrollY || 0); }, configurable: true },
+  offsetX: { get() { return this.clientX - (this.target?.getBoundingClientRect?.().left || 0); }, configurable: true },
+  offsetY: { get() { return this.clientY - (this.target?.getBoundingClientRect?.().top || 0); }, configurable: true },
+});
 
 // ---- shadow DOM event support ----
 // Duck-typed (ShadowRoot sets `__isShadowRoot`/`host`) to avoid a dom.mjs import
@@ -164,7 +186,7 @@ export class EventTarget {
   }
 
   addEventListener(type, callback, options) {
-    if (callback == null) return;
+    if (callback == null || options?.signal?.aborted) return;
     // Inlined option parsing — avoids a throwaway normalizeOptions object AND a
     // per-call .some() closure on this hot path (React attaches many listeners
     // at mount). Boolean options → capture; object → capture/once/passive.
@@ -176,7 +198,13 @@ export class EventTarget {
     if (!list) { list = []; this.__listeners.set(type, list); }
     // dedupe on (callback, capture) per spec
     for (let i = 0; i < list.length; i++) if (list[i].callback === callback && list[i].capture === capture) return;
-    list.push({ callback, capture, once, passive });
+    const listener = { callback, capture, once, passive };
+    if (options?.signal) {
+      listener.signal = options.signal;
+      listener.abort = () => this.removeEventListener(type, callback, capture);
+      listener.signal.addEventListener('abort', listener.abort, { once: true });
+    }
+    list.push(listener);
   }
 
   removeEventListener(type, callback, options) {
@@ -185,7 +213,12 @@ export class EventTarget {
     const list = this.__listeners.get(type);
     if (!list) return;
     for (let i = 0; i < list.length; i++) {
-      if (list[i].callback === callback && list[i].capture === capture) { list.splice(i, 1); return; }
+      if (list[i].callback === callback && list[i].capture === capture) {
+        const listener = list[i];
+        listener.removed = true;
+        if (listener.signal) listener.signal.removeEventListener('abort', listener.abort);
+        list.splice(i, 1); return;
+      }
     }
   }
 
@@ -244,7 +277,7 @@ export class EventTarget {
     if (type === 'click' && event.bubbles && (event instanceof MouseEvent || event instanceof PointerEvent)) {
       for (const node of path) {
         const tag = node.localName;
-        if (tag === 'button' || tag === 'input' || tag === 'label' || tag === 'select' || tag === 'textarea' || (tag === 'a' && node.hasAttribute('href'))) {
+        if (tag === 'button' || tag === 'input' || tag === 'label' || tag === 'select' || tag === 'textarea' || tag === 'summary' || (tag === 'a' && node.hasAttribute('href'))) {
           defaultActionTarget = node;
           break;
         }
@@ -278,12 +311,14 @@ export class EventTarget {
       const snap = list.length === 1 ? list : list.slice();
       for (let k = 0, len = snap.length; k < len; k++) {
         const l = snap[k];
+        if (l.removed) continue;
         if (phase === PHASE_CAPTURING && !l.capture) continue;
         if (phase === PHASE_BUBBLING && l.capture) continue;
         if (l.once) {
           const cur = node.__listeners.get(event.type);
           const idx = cur ? cur.indexOf(l) : -1;
           if (idx !== -1) cur.splice(idx, 1);
+          if (l.signal) l.signal.removeEventListener('abort', l.abort);
         }
         event._passiveListener = l.passive;
         const handler = typeof l.callback === 'function' ? l.callback : l.callback.handleEvent;

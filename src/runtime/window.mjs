@@ -11,16 +11,17 @@ import {
   makeLocation, makeHistory,
 } from './stubs.mjs';
 import { makeGetComputedStyle } from './cascade.mjs';
-import { CSSStyleSheet } from './cssom.mjs';
+import { DOMRect, DOMRectReadOnly } from './geometry.mjs';
+import { CSSStyleSheet, CSSStyleRule } from './cssom.mjs';
 import { NamedNodeMap } from './collections.mjs';
 import { createCustomElementContext, CustomElementRegistry } from './custom-elements.mjs';
 import { MessageChannel, MessagePort, cloneMessage } from './messaging.mjs';
 import {
-  Node, Element, CanvasElement, MediaElement, MEDIA_CONSTANTS, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
-  MutationObserver, DOMParser, XMLSerializer, ShadowRoot,
+  Node, Element, HTMLElement as HtmlElement, HTMLInputElement as InputElement, HTMLTextAreaElement as TextAreaElement, HTMLSelectElement as SelectElement, CanvasElement, MediaElement, MEDIA_CONSTANTS, SVGElement, Text, Comment, Document, DocumentFragment, DocumentType, Event, CustomEvent,
+  MutationObserver, DOMParser, XMLSerializer, ShadowRoot, Range,
 } from './dom.mjs';
 import {
-  EventTarget, MessageEvent,
+  EventTarget, MessageEvent, ErrorEvent, StorageEvent, PromiseRejectionEvent,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,
   CompositionEvent, WheelEvent, TouchEvent, DragEvent, ProgressEvent,
 } from './events.mjs';
@@ -218,7 +219,7 @@ const SHARED_LAZY = {
     userAgent: 'Mozilla/5.0 (turbo-dom) AppleWebKit/537.36',
     platform: 'turbo-dom', vendor: '', language: 'en-US', languages: ['en-US'],
     onLine: true, cookieEnabled: true, doNotTrack: null, maxTouchPoints: 0,
-    hardwareConcurrency: 4, deviceMemory: 8, webdriver: false,
+    hardwareConcurrency: 4, webdriver: false,
     clipboard: { readText: async () => '', writeText: async () => {}, read: async () => [], write: async () => {} },
     permissions: { query: async () => ({ state: 'prompt', addEventListener() {}, removeEventListener() {} }) },
     sendBeacon: () => true, vibrate: () => false,
@@ -249,7 +250,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   let generation = 0;
   let frames;
   let customElements;
-  const customContext = () => customElements ||= createCustomElementContext(document, Element, isAncestorActive);
+  const customContext = () => customElements ||= createCustomElementContext(document, HtmlElement, isAncestorActive);
   const receiver = () => document.defaultView || windowProxy;
   let messageListener, messageErrorListener;
   const setHandler = (type, previous, next, listener) => {
@@ -325,6 +326,16 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
   // Everything env-independent lives in the module-level SHARED_LAZY (built once,
   // not re-allocated per test file) — see below. None constructed until touched.
   const lazy = {
+    Range: () => {
+      function WindowRange() { if (!new.target) throw new TypeError('Range requires new'); return Reflect.construct(Range, [document], new.target); }
+      WindowRange.prototype = Range.prototype;
+      return WindowRange;
+    },
+    DocumentFragment: () => {
+      function WindowDocumentFragment() { if (!new.target) throw new TypeError('DocumentFragment requires new'); return Reflect.construct(DocumentFragment, [document], new.target); }
+      WindowDocumentFragment.prototype = DocumentFragment.prototype;
+      return WindowDocumentFragment;
+    },
     HTMLElement: () => customContext().HTMLElement,
     customElements: () => customContext().registry,
     Audio: () => {
@@ -408,6 +419,7 @@ export function createWindow(document, { url = 'http://localhost/', parentWindow
       const parentGeneration = generation;
       const childDocument = new DOMParser().parseFromString(html, 'text/html');
       const entry = { html, hasSrcdoc, window: null };
+      childDocument.__geometry = document.__geometry;
       const win = createWindow(childDocument, {
         url: hasSrcdoc ? 'about:srcdoc' : 'about:blank',
         parentWindow: receiver(), topWindow: receiver().top, frameElement: frame,
@@ -568,14 +580,24 @@ function makeXHR() {
 // Stateless globals — identical for every window, so built ONCE at module load
 // instead of per createWindow() (per test file). createWindow's Proxy falls back
 // to this after its tiny per-env `base`. Nothing here captures document/url/window.
+function NodeFilter() { throw new TypeError('Illegal constructor'); }
+const FILTER_CONSTANTS = { FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3, SHOW_ALL: 0xffffffff,
+  SHOW_ELEMENT: 1, SHOW_ATTRIBUTE: 2, SHOW_TEXT: 4, SHOW_CDATA_SECTION: 8,
+  SHOW_ENTITY_REFERENCE: 16, SHOW_ENTITY: 32, SHOW_PROCESSING_INSTRUCTION: 64,
+  SHOW_COMMENT: 128, SHOW_DOCUMENT: 256, SHOW_DOCUMENT_TYPE: 512, SHOW_DOCUMENT_FRAGMENT: 1024, SHOW_NOTATION: 2048 };
+for (const [name, value] of Object.entries(FILTER_CONSTANTS)) {
+  Object.defineProperty(NodeFilter, name, { value, enumerable: true });
+  Object.defineProperty(NodeFilter.prototype, name, { value, enumerable: true });
+}
+
 const STATIC_BASE = {
   // DOM + event constructors (cheap class refs)
-  Node, Element, Text, Comment, Document, DocumentFragment, DocumentType, EventTarget, NamedNodeMap,
+  Node, Element, Text, Comment, Document, DocumentType, EventTarget, NamedNodeMap,
   ShadowRoot,
-  Event, CustomEvent, MessageEvent,
+  Event, CustomEvent, MessageEvent, ErrorEvent, StorageEvent, PromiseRejectionEvent, DOMRect, DOMRectReadOnly, NodeFilter,
   UIEvent, MouseEvent, PointerEvent, KeyboardEvent, InputEvent, FocusEvent,
   CompositionEvent, WheelEvent, TouchEvent, DragEvent, ProgressEvent, ClipboardEvent,
-  DataTransfer,
+  DataTransfer, CSSStyleRule,
   // HTML interfaces inherit Element → `el instanceof HTMLElement` is true.
   // Tag-specific interfaces match by localName via Symbol.hasInstance.
   CustomElementRegistry, SVGElement,
@@ -595,8 +617,8 @@ const STATIC_BASE = {
   SVGTitleElement: tagClass('title'), SVGDescElement: tagClass('desc'),
   SVGForeignObjectElement: tagClass('foreignObject'),
   SVGGraphicsElement: Element, SVGGeometryElement: Element, SVGTextContentElement: Element,
-  HTMLAnchorElement: tagClass('a'), HTMLInputElement: tagClass('input'),
-  HTMLTextAreaElement: tagClass('textarea'), HTMLSelectElement: tagClass('select'),
+  HTMLAnchorElement: tagClass('a'), HTMLInputElement: tagClass('input', InputElement.prototype),
+  HTMLTextAreaElement: tagClass('textarea', TextAreaElement.prototype), HTMLSelectElement: tagClass('select', SelectElement.prototype),
   HTMLOptionElement: tagClass('option'), HTMLButtonElement: tagClass('button'),
   HTMLFormElement: tagClass('form'), HTMLImageElement: tagClass('img'),
   HTMLCanvasElement: tagClass('canvas', CanvasElement.prototype), HTMLTemplateElement: tagClass('template'),

@@ -474,20 +474,24 @@ test('createComment / createAttribute', () => {
   assert.equal(a.value, '');
 });
 
-test('createNodeIterator: nextNode/previousNode/firstChild/lastChild', () => {
+test('createNodeIterator includes root and preserves the before-reference cursor', () => {
   const { document } = fresh();
   const root = document.getElementById('root');
   root.innerHTML = '<a></a><b><i></i></b>';
   const it = document.createNodeIterator(root, 1 /* elements */);
+  assert.equal(it.previousNode(), null);
+  assert.equal(it.nextNode(), root);
   assert.equal(it.nextNode().localName, 'a');
   assert.equal(it.nextNode().localName, 'b');
   const i = it.nextNode();
   assert.equal(i.localName, 'i');
+  assert.equal(it.previousNode().localName, 'i');
   assert.equal(it.previousNode().localName, 'b');
+  assert.equal(it.nextNode().localName, 'b');
   // firstChild / lastChild move the current node
-  const it2 = document.createNodeIterator(root, 1);
+  const it2 = document.createTreeWalker(root, 1);
   assert.equal(it2.firstChild().localName, 'a');
-  const it3 = document.createNodeIterator(root, 1);
+  const it3 = document.createTreeWalker(root, 1);
   assert.equal(it3.lastChild().localName, 'b');
 });
 

@@ -130,8 +130,9 @@ test('image shorthand recognition preserves URL contents and rejects unsupported
   document.body.appendChild(element);
   for (const image of ['url("data:image/svg+xml,a,b")', 'url(a\\)b)', 'image-set(url(a) 1x, url(b) 2x)', 'url(a), none', "url('a,(b)')", 'none']) {
     element.style.cssText = `background: ${image}`;
-    assert.equal(element.style.backgroundImage, image);
-    assert.equal(window.getComputedStyle(element).backgroundImage, image);
+    const expected = image === "url('a,(b)')" ? 'url("a,(b)")' : image;
+    assert.equal(element.style.backgroundImage, expected);
+    assert.equal(window.getComputedStyle(element).backgroundImage, expected);
   }
   for (const value of ['', 'url(a', 'url("a)', 'url(a),', 'url(a) no-repeat', 'var(--image)']) {
     element.style.cssText = `background: ${value}`;

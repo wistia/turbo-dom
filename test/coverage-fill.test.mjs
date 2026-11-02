@@ -492,17 +492,12 @@ test('synthetic geometry: stable, block fills parent, inline shrink-wraps, child
   assert.ok(p.getBoundingClientRect().height >= h1);
 });
 
-test('Element.animate returns a controllable Animation-like stub', async () => {
-  const { document } = fresh();
-  const el = document.createElement('div');
-  const anim = el.animate([{ opacity: 0 }, { opacity: 1 }], 100);
-  assert.equal(anim.play(), undefined);
-  assert.equal(anim.pause(), undefined);
-  assert.equal(anim.cancel(), undefined);
-  assert.equal(anim.finish(), undefined);
-  assert.equal(anim.onfinish, null);
-  await anim.finished; // resolves
-  assert.equal(typeof el.getAnimations, 'undefined');
+test('unsupported Web Animations APIs allow animation libraries to use their JS fallback', () => {
+  const { window, document } = fresh();
+  assert.equal(Object.hasOwnProperty.call(window.Element.prototype, 'animate'), false);
+  assert.equal('animate' in document.createElement('div'), false);
+  assert.equal('animate' in document.createElementNS('http://www.w3.org/2000/svg', 'svg'), false);
+  assert.equal(typeof document.createElement('div').getAnimations, 'undefined');
 });
 
 test('Element.requestFullscreen resolves; toDataURL is the empty data URL', async () => {

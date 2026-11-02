@@ -1,3 +1,5 @@
+import { splitDeclarations } from './css-values.mjs';
+
 // Minimal CSSOM — just enough for CSS-in-JS engines (emotion / styled-components /
 // MUI) to inject rules at runtime without throwing, AND to feed those rules into
 // the partial cascade (cascade.mjs) so getComputedStyle resolves them.
@@ -16,7 +18,32 @@
 export class CSSStyleRule {
   constructor(cssText) {
     this.cssText = String(cssText);
+    const open = this.cssText.indexOf('{'), close = this.cssText.lastIndexOf('}');
+    if (open !== -1 && close !== -1 && !this.cssText.trimStart().startsWith('@')) {
+      const declarations = splitDeclarations(this.cssText.slice(open + 1, close));
+      const formatted = [];
+      for (const declaration of declarations) {
+        const colon = declaration.indexOf(':');
+        if (colon !== -1) formatted.push(`${declaration.slice(0, colon).trim()}: ${declaration.slice(colon + 1).trim()};`);
+      }
+      this.cssText = `${this.cssText.slice(0, open).trim()} {${formatted.length ? ' ' + formatted.join(' ') + ' ' : ''}}`;
+    }
     this.type = 1; // CSSRule.STYLE_RULE
+  }
+  get style() {
+    const text = this.cssText;
+    const declarations = splitDeclarations(text.slice(text.indexOf('{') + 1, text.lastIndexOf('}')));
+    const values = new Map(), priorities = new Map();
+    for (const declaration of declarations) {
+      const colon = declaration.indexOf(':');
+      if (colon !== -1) {
+        const name = declaration.slice(0, colon).trim(), value = declaration.slice(colon + 1).trim();
+        const important = /\s*!\s*important\s*$/i.exec(value);
+        values.set(name, important ? value.slice(0, important.index).trim() : value);
+        if (important) priorities.set(name, 'important');
+      }
+    }
+    return { getPropertyValue: property => values.get(property) || '', getPropertyPriority: property => priorities.get(property) || '' };
   }
   get selectorText() {
     const i = this.cssText.indexOf('{');

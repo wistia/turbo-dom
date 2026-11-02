@@ -611,5 +611,5 @@ test('<style>.textContent merges authored text with injected rules; plain style 
   assert.equal(s.textContent, '.a{color:red}'); // no sheet touched → verbatim
   s.sheet.insertRule('.b{color:blue}', 0);
   assert.ok(s.textContent.includes('.a{color:red}'));
-  assert.ok(s.textContent.includes('.b{color:blue}'));
+  assert.ok(s.textContent.includes('.b { color: blue; }'));
 });

@@ -73,7 +73,13 @@ function parseAttr(inner) {
     ((value[0] === '"' && value[value.length - 1] === '"') ||
       (value[0] === "'" && value[value.length - 1] === "'"))
   ) {
-    value = value.slice(1, -1);
+    value = value.slice(1, -1).replace(/\\([0-9a-fA-F]{1,6}\s?|[\s\S])/g, (_, escape) => {
+      if (/^[0-9a-fA-F]/.test(escape)) {
+        const point = parseInt(escape, 16);
+        return point === 0 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff) ? '\ufffd' : String.fromCodePoint(point);
+      }
+      return /[\n\r\f]/.test(escape) ? '' : escape;
+    });
   }
   return { name: name.trim(), match: { op, value } };
 }
@@ -88,6 +94,7 @@ function scanBalanced(src, start, open, close) {
   let depth = 1, i = start, quote = null;
   for (; i < n; i++) {
     const d = src[i];
+    if (d === '\\') { i++; continue; }
     if (quote) { if (d === quote) quote = null; continue; }
     if (d === '"' || d === "'") quote = d;
     else if (d === open) depth++;
@@ -349,6 +356,17 @@ function matchPseudo(el, p) {
       return el.parentNode == null || el.parentNode.nodeType === 9;
     // form-state pseudo-classes — read the live PROPERTY (what React sets),
     // not just the HTML attribute.
+    case 'focus':
+    case 'focus-visible':
+      return !!el.ownerDocument?.__active && el.getRootNode().activeElement === el;
+    case 'focus-within': {
+      let active = el.ownerDocument?.__active;
+      while (active) {
+        if (active === el) return true;
+        active = active.parentNode || (active.__isShadowRoot ? active.host : null);
+      }
+      return false;
+    }
     case 'defined':
       return !!isCustomElementDefined(el);
     case 'checked':

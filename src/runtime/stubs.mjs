@@ -41,7 +41,17 @@ export function makeCanvasStub() {
 export { makeCustomElements } from './custom-elements.mjs';
 
 export class Storage {
-  constructor() { this.__map = new Map(); }
+  constructor() {
+    Object.defineProperty(this, '__map', { value: new Map(), configurable: true });
+    return new Proxy(this, {
+      get(target, key, receiver) { return Reflect.has(target, key) ? Reflect.get(target, key, receiver) : target.__map.get(key); },
+      set(target, key, value) { if (typeof key === 'symbol') return Reflect.set(target, key, value); target.setItem(key, value); return true; },
+      deleteProperty(target, key) { target.removeItem(key); return true; },
+      ownKeys(target) { return [...Reflect.ownKeys(target), ...[...target.__map.keys()].filter(key => !Reflect.has(target, key))]; },
+      getOwnPropertyDescriptor(target, key) { return Reflect.getOwnPropertyDescriptor(target, key) || (target.__map.has(key) ? { value: target.__map.get(key), writable: true, enumerable: true, configurable: true } : undefined); },
+      has(target, key) { return Reflect.has(target, key) || target.__map.has(key); },
+    });
+  }
   get length() { return this.__map.size; }
   key(i) { return [...this.__map.keys()][i] ?? null; }
   getItem(k) { return this.__map.has(String(k)) ? this.__map.get(String(k)) : null; }
@@ -147,13 +157,13 @@ export function makeLocation(href = 'http://localhost/') {
   const u = new URL(href);
   const location = {
     get href() { return u.href; }, set href(v) { /* navigation is a no-op in headless */ },
-    get protocol() { return u.protocol; },
-    get host() { return u.host; },
-    get hostname() { return u.hostname; },
-    get port() { return u.port; },
-    get pathname() { return u.pathname; },
-    get search() { return u.search; },
-    get hash() { return u.hash; },
+    get protocol() { return u.protocol; }, set protocol(_value) {},
+    get host() { return u.host; }, set host(_value) {},
+    get hostname() { return u.hostname; }, set hostname(_value) {},
+    get port() { return u.port; }, set port(_value) {},
+    get pathname() { return u.pathname; }, set pathname(_value) {},
+    get search() { return u.search; }, set search(_value) {},
+    get hash() { return u.hash; }, set hash(value) { u.hash = value; },
     get origin() { return u.origin; },
     assign() {}, replace() {}, reload() {}, toString() { return u.href; },
   };

@@ -11,8 +11,8 @@ const DEFAULT_HTML = '<!doctype html><html><head></head><body></body></html>';
 // primitives off globalThis; pointing it at our window Proxy hides Symbol et al).
 const SELF_KEYS = ['window', 'self', 'parent', 'top', 'frames'];
 
-export function installGlobals(target, { html = DEFAULT_HTML, url } = {}) {
-  const env = createEnvironment(html, url ? { url } : {});
+export function installGlobals(target, { html = DEFAULT_HTML, url, geometry } = {}) {
+  const env = createEnvironment(html, { url, geometry });
   const { window } = env;
 
   const installed = [];                 // keys we defined

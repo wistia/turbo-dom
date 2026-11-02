@@ -75,6 +75,7 @@ export function createEnvironment(html = '<!doctype html><html><head></head><bod
   // so the last mode set wins. Embedders wanting a fully node-free path inject a
   // binding via setParser()/globalThis.__TURBO_DOM_PARSER__ instead.
   if (options.parser) setParserMode(options.parser);
+  if (options.geometry !== undefined && options.geometry !== 'zero' && options.geometry !== 'synthetic') throw new TypeError('Unknown geometry mode');
 
   // Layer 1: native parse → immutable SoA buffer (typed arrays, one boundary copy).
   let currentHtml = String(html);
@@ -82,6 +83,7 @@ export function createEnvironment(html = '<!doctype html><html><head></head><bod
 
   // Layer 2: Document over the buffer (nodes inflate lazily from the arrays).
   const document = new Document();
+  document.__geometry = options.geometry;
   // declarative shadow roots only when the source even mentions them (cheap gate)
   const maybePromote = () => { if (currentHtml.includes('shadowroot')) promoteDeclarativeShadowRoots(document); };
   document.__load(soa);
