@@ -1727,6 +1727,25 @@ function followingNode(node, root) {
   return null;
 }
 class NodeIterator extends TreeWalker {
+  __remember(node) {
+    const predecessors = [];
+    let previous = node;
+    while (previous && previous !== this.root) {
+      let sibling = previous.previousSibling;
+      if (sibling) { while (sibling.lastChild) sibling = sibling.lastChild; predecessors.push(sibling); }
+      previous = previous.parentNode;
+      if (previous) predecessors.push(previous);
+    }
+    this.__predecessors = predecessors;
+    const successors = [];
+    if (node.firstChild) successors.push(node.firstChild);
+    let ancestor = node;
+    while (ancestor && ancestor !== this.root) {
+      if (ancestor.nextSibling) successors.push(ancestor.nextSibling);
+      ancestor = ancestor.parentNode;
+    }
+    this.__successors = successors;
+  }
   previousNode() {
     let node = this.referenceNode;
     const preceding = current => {
@@ -1741,6 +1760,7 @@ class NodeIterator extends TreeWalker {
     while (node) {
       if (this.__show(node) === 1) {
         this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = true;
+        this.__remember(node);
         return node;
       }
       node = preceding(node);
@@ -1755,23 +1775,7 @@ class NodeIterator extends TreeWalker {
     while (node) {
       if (this.__show(node) === 1) {
         this.referenceNode = node; this.currentNode = node; this.pointerBeforeReferenceNode = false;
-        const predecessors = [];
-        let previous = node;
-        while (previous && previous !== this.root) {
-          let sibling = previous.previousSibling;
-          if (sibling) { while (sibling.lastChild) sibling = sibling.lastChild; predecessors.push(sibling); }
-          previous = previous.parentNode;
-          if (previous) predecessors.push(previous);
-        }
-        this.__predecessors = predecessors;
-        const successors = [];
-        if (node.firstChild) successors.push(node.firstChild);
-        let ancestor = node;
-        while (ancestor && ancestor !== this.root) {
-          if (ancestor.nextSibling) successors.push(ancestor.nextSibling);
-          ancestor = ancestor.parentNode;
-        }
-        this.__successors = successors;
+        this.__remember(node);
         return node;
       }
       node = followingNode(node, this.root);

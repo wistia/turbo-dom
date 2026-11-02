@@ -438,3 +438,16 @@ test('TreeWalker stops safely after removing its current node', () => {
     return walker.nextNode();
   });
 });
+
+
+test('NodeIterator refreshes removal recovery after backward traversal', () => {
+  compare(window => {
+    const root = window.document.createElement('div');
+    root.innerHTML = '<a></a><b></b><i></i>';
+    const iterator = window.document.createNodeIterator(root, window.NodeFilter.SHOW_ELEMENT);
+    for (let i = 0; i < 4; i++) iterator.nextNode();
+    iterator.previousNode();
+    iterator.previousNode().remove();
+    return iterator.previousNode()?.tagName;
+  });
+});
